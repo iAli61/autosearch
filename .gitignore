@@ -1,0 +1,12 @@
+chromadb
+*.db
+*OAI_CONFIG_LIST*
+*.pyc
+*.pkl
+*.sqlite
+*.sqlite3
+*.log
+*.pickle
+nb/arxiv_user_proxy/rag_teachablitity/AI_security
+*.bin
+nb/arxiv_user_proxy/rag_teachablitity
