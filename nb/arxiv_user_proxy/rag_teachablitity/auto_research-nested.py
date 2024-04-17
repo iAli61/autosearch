@@ -31,6 +31,7 @@ nest_asyncio.apply()
 version = "0.1.2"
 ProjectID = "AI_security"
 initiate_db = True
+config_file = "OAI_CONFIG_LIST-sweden-505"
 
 
 Project_dir = Path(f"./{ProjectID}/{version}")
@@ -60,7 +61,7 @@ if initiate_db:
         pickle.dump(read_abstracts, f)
 
 config_list = autogen.config_list_from_json(
-    "OAI_CONFIG_LIST",
+    config_file,
     file_location=".",
     filter_dict={
         "model": ["gpt-4-32k", "gpt-4", "gpt4", "gpt-35-turbo-16k", "gpt-4-0613", "gpt-3.5-turbo", "gpt-35-turbo", "gpt-35-turbo-0613"]
@@ -190,7 +191,7 @@ def arxiv_retriever(queries: Annotated[List[str], "The list of query texts to se
 
 message = ["Large Language Models safety and reliability", "AI systems reliability mechanisms", "Methodologies for improving AI safety", "Recent advancements in AI system safety", "Latest research in AI reliability"]
 if initiate_db:
-    arxiv_retriever(message, n_results=10)
+    arxiv_retriever(message, n_results=5)
 
 # %% [markdown]
 # ### read pdf
