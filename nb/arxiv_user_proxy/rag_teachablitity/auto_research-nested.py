@@ -5,7 +5,7 @@
 import asyncio
 from typing import Dict, List, Optional, Union, Callable
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
-from autogen.formatting_utils import colored
+from autogen.formatting_utils import colored # type: ignore
 from typing_extensions import Annotated
 import autogen
 
@@ -25,14 +25,13 @@ import pickle
 import re
 from pathlib import Path
 
-import nest_asyncio
+import nest_asyncio # type: ignore
 nest_asyncio.apply()
 
-version = "0.1.2"
+version = "0.1.3"
 ProjectID = "AI_security"
 initiate_db = True
 config_file = "OAI_CONFIG_LIST-sweden-505"
-
 
 Project_dir = Path(f"./{ProjectID}/{version}")
 
@@ -142,11 +141,14 @@ def initiate_chat_with_paper_info(paper, query_text, message):
 
     # Create a TeachableAgent and UserProxyAgent to represent the researcher and the user, respectively.
     arxiver, arxiver_user = create_teachable_groupchat("arxiver", "arxiver_user", db_dir, config_list, verbosity=0)
-
-    arxiver_user.initiate_chat(arxiver,
-                       silent=True,
-                       message=f"The following article is one of the articles that I found for '{query_text}' topic: \n\n '{paper.title}' by {paper.authors} updated on {paper.updated}: {paper.pdf_url} \nsummary: {paper.summary} \n?")
-    message += f"Title: {paper.title} Authors: {paper.authors} URL: {paper.pdf_url} os added to MEMOS\n\n "
+    try:
+        arxiver_user.initiate_chat(arxiver,
+                        silent=True,
+                        message=f"The following article is one of the articles that I found for '{query_text}' topic: \n\n '{paper.title}' by {paper.authors} updated on {paper.updated}: {paper.pdf_url} \nsummary: {paper.summary} \n?")
+        message += f"Title: {paper.title} Authors: {paper.authors} URL: {paper.pdf_url} os added to MEMOS\n\n "
+        
+    except Exception as e:
+        print(f"Error: {e}")
 
 def process_query(query_text, n_results, message):
     """Function to process each query and initiate chats for each paper found."""
@@ -191,7 +193,7 @@ def arxiv_retriever(queries: Annotated[List[str], "The list of query texts to se
 
 message = ["Large Language Models safety and reliability", "AI systems reliability mechanisms", "Methodologies for improving AI safety", "Recent advancements in AI system safety", "Latest research in AI reliability"]
 if initiate_db:
-    arxiv_retriever(message, n_results=5)
+    arxiv_retriever(message, n_results=10)
 
 # %% [markdown]
 # ### read pdf
@@ -224,10 +226,14 @@ def download_pdf(url, save_path):
 
 def initiate_chat_read_paper(text, article):
     paper_reader, reader_user = create_teachable_groupchat("paper_reader", "reader_user", db_dir, config_list, verbosity=0)
-    reader_user.initiate_chat(paper_reader,
-                       silent=True,
-                       message=f"MEMORIZE_ARTICLE: The following passage is extracted from an article titled '{article}': \n\n {text}."
-                    )
+    try:
+        reader_user.initiate_chat(paper_reader,
+                        silent=True,
+                        message=f"MEMORIZE_ARTICLE: The following passage is extracted from an article titled '{article}': \n\n {text}."
+                        )
+    except Exception as e:
+        print(f"Error: {e}")
+        print(colored(f"text: {text}", "red"))
     
 def chunk_pdf(url, title):
     
