@@ -277,9 +277,10 @@ class MemoStore:
             self.reset_db()
 
     def sync_momes(self):
-        print(colored("********************************", "light_cyan"))
-        print(colored("* SYNC DISK MEMORY with VEC_DB *", "light_cyan"))
-        print(colored("********************************", "light_cyan"))
+        if self.verbosity >= 1:
+            print(colored("********************************", "light_cyan"))
+            print(colored("* SYNC DISK MEMORY with VEC_DB *", "light_cyan"))
+            print(colored("********************************", "light_cyan"))
         memo = self.vec_db.get()
         for i in range(len(memo["ids"])):
             uid, input_text, output_text = memo["ids"][i], memo["documents"][i], memo["metadatas"][i]["answer"]
