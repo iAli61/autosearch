@@ -3,11 +3,12 @@
 
 # %%
 import asyncio
-from typing import Dict, List, Optional, Union, Callable
+from typing import Dict, List, Optional, Union, Callable, Literal
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
-from autogen.formatting_utils import colored # type: ignore
+from autogen.formatting_utils import colored
 from typing_extensions import Annotated
 import autogen
+from autogen import Agent
 
 from teachability import Teachability
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -25,13 +26,43 @@ import pickle
 import re
 from pathlib import Path
 
-import nest_asyncio # type: ignore
+import nest_asyncio
 nest_asyncio.apply()
 
-version = "0.1.3"
+# %% [markdown]
+# ### parameters
+
+# %%
+version = "0.1.4"
 ProjectID = "AI_security"
 initiate_db = True
 config_file = "OAI_CONFIG_LIST-sweden-505"
+max_round = 30
+silent = False
+recall_threshold = 1.4 
+# config_file = "OAI_CONFIG_LIST"
+
+topic = 'Survey on Reliability and Safety Mechanisms in AI Systems and the most recent advancement'
+
+task = """
+As a recognized authority on enhancing the reliability and safety of AI systems, you're invited to illuminate our AI community with your insights through a scientific article titled "{topic}".
+
+Your expertise will guide our audience through the nuances of ensuring AI operates within safe and reliable parameters, with a special focus on Large Language Models (LLMs). Here's how to structure your invaluable contribution:
+
+- **Core Theme:** Anchor your discussion around Large Language Models, highlighting their significance in the current AI landscape and why reliability and safety are paramount.
+
+- **Innovative Progress:** Dive into the latest breakthroughs and methodologies [at least 3 methodologies] that have emerged in the domain of AI reliability and safety. Showcase [with reference to original paper] how these advancements are shaping the future of responsible AI development and implementation.
+
+- **Accessible Insight:** While your post will be rich in information, ensure it's crafted in a manner that demystifies complex concepts for those outside the tech sphere. Your goal is to enlighten, not overwhelm.
+
+- **Credible Sources:** You MUST Strengthen your narrative by integrating references to the research, studies, and sources that informed your insights. Additionally, provide these references for readers seeking to delve deeper into the subject.
+
+- **Current Perspective:** Reflect the cutting-edge of the field by incorporating the most recent findings and research available in your database. Your post should serve as a timely resource for anyone looking to understand the state-of-the-art in AI safety and reliability mechanisms.
+
+This blog post is an opportunity to not just share knowledge but to foster a deeper understanding and appreciation for the ongoing efforts to make AI systems more reliable and safe for everyone. Your contribution will undoubtedly be a beacon for those navigating the complexities of AI in our increasingly digital world.
+You are equipped  with a function that could read a paper for you. If you need a missing info please update you knowledge base.
+"""
+
 
 Project_dir = Path(f"./{ProjectID}/{version}")
 
@@ -124,7 +155,7 @@ def create_teachable_groupchat(assitant_name, user_name, db_dir, config_list, ve
 
 # %%
 if initiate_db:
-    prompt = "For each memorization task, initiate your process with 'MEMORIZE_ARTICLE: The following passage is extracted from an article, titled article_title [article_url]: \n\n' Delve into the passage to discern and assess its key insights. If the content presents noteworthy information, make a point to memorize these details. Conversely, if the passage does not offer significant insights, there's no need to commit it to memory. Upon choosing to memorize, finalize your notes by including both the article's title and its URL, employing the format '[source: article_title, article_url]' for efficient future access and verification."
+    prompt = "For each memorization task, initiate your process with 'MEMORIZE_ARTICLE:'  \n\n' Delve into the passage to discern and assess its key insights. If the content presents noteworthy information, make a point to memorize these details. Conversely, if the passage does not offer significant insights, there's no need to commit it to memory. Upon choosing to memorize, you MUST finalize your notes by including both the article's title and its URL, employing the format '[source: article_title, article_url]' for efficient future access and verification."
 
     instract_assistant, instract_user = create_teachable_groupchat("instract_assistant", "instract_user", db_dir, config_list, verbosity=3)
 
@@ -132,34 +163,79 @@ if initiate_db:
 
 # %% [markdown]
 # ## Define functions
+# 
+# ### Arxiv funcs
+
+# %%
+def _arxiv_search(query, n_results=10):
+    sort_by = arxiv.SortCriterion.Relevance
+    papers = arxiv.Search(query=query, max_results=n_results, sort_by=sort_by)
+    papers = list(arxiv.Client().results(papers))
+    return papers
+
+def arxiv_search(query : Annotated[str, "The title of paper to search for in arxiv."]) -> str:
+    papers = _arxiv_search(query, n_results=5)
+    if len(papers)>0:
+        return ''.join([f" \n\n {i+1}. Title: {paper.title} Authors: {', '.join([str(au) for au in paper.authors])} URL: {paper.pdf_url}" for i, paper in enumerate(papers)])
+    else:
+        return "There are no papers found in arxiv for the given query."
+
+text = "Human-Centred Learning Analytics and AI in Education: a Systematic Literature Review"
+# arxiv_search(query=text)
+
+# %%
+
+def get_paper_id(url):
+    if '/pdf/' in url:
+        return url.split('/')[-1].replace('.pdf', '')
+    if '/abs/' in url:
+        return url.split('/')[-1]
+    return url
+
+def get_paper_metadata(url):
+    
+    paper_id = get_paper_id(url)
+    
+    search_by_id = arxiv.Search(id_list=[paper_id])
+    paper = list(arxiv.Client().results(search_by_id))[0]
+    title = paper.title
+    link = paper._raw['link']
+    updated = paper.updated
+    summary = paper.summary
+    pdf_url = paper.pdf_url
+    authors = ', '.join([str(au) for au in paper.authors])
+
+    return title, link, updated, summary, pdf_url, paper_id, authors
+
+# get_paper_metadata('https://arxiv.org/abs/1810.04805')
+# get_paper_metadata('https://arxiv.org/pdf/1810.04805.pdf')
+# get_paper_metadata('1810.04805')
 
 # %% [markdown]
 # ### arxiv retrieval
 
 # %%
-def initiate_chat_with_paper_info(paper, query_text, message):
+def initiate_chat_with_paper_info(paper, query):
 
     # Create a TeachableAgent and UserProxyAgent to represent the researcher and the user, respectively.
     arxiver, arxiver_user = create_teachable_groupchat("arxiver", "arxiver_user", db_dir, config_list, verbosity=0)
     try:
         arxiver_user.initiate_chat(arxiver,
                         silent=True,
-                        message=f"The following article is one of the articles that I found for '{query_text}' topic: \n\n '{paper.title}' by {paper.authors} updated on {paper.updated}: {paper.pdf_url} \nsummary: {paper.summary} \n?")
-        message += f"Title: {paper.title} Authors: {paper.authors} URL: {paper.pdf_url} os added to MEMOS\n\n "
+                        message=f"The following article is one of the articles that I found for '{query}' topic: \n\n '{paper.title}' by {paper.authors} updated on {paper.updated}: {paper.pdf_url} \nsummary: {paper.summary} \n?")
+        
+        return f"Title: {paper.title} Authors: {paper.authors} URL: {paper.pdf_url} os added to MEMOS\n\n "
         
     except Exception as e:
         print(f"Error: {e}")
 
-def process_query(query_text, n_results, message):
+def process_query(query, n_results):
     """Function to process each query and initiate chats for each paper found."""
-    sort_by = arxiv.SortCriterion.Relevance
-    papers = arxiv.Search(query=query_text, max_results=n_results, sort_by=sort_by)
+    papers = _arxiv_search(query, n_results=n_results)
 
     # check if the abstract has been read before
     with open(f'{Project_dir}/read_abstracts.pkl', 'rb') as f:
         read_abstracts = pickle.load(f)
-
-    papers = list(arxiv.Client().results(papers))
     papers = [paper for paper in papers if paper.pdf_url not in read_abstracts]
 
     # add papers to the read_papers list
@@ -171,7 +247,7 @@ def process_query(query_text, n_results, message):
 
     
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(initiate_chat_with_paper_info, paper, query_text, message) for paper in papers]
+        futures = [executor.submit(initiate_chat_with_paper_info, paper, query) for paper in papers]
         for future in as_completed(futures):
             future.result()
 
@@ -181,9 +257,9 @@ def arxiv_retriever(queries: Annotated[List[str], "The list of query texts to se
     
     
 
-    message = ""
+    
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_query, query_text, n_results, message) for query_text in queries]
+        futures = [executor.submit(process_query, query_text, n_results) for query_text in queries]
         for future in as_completed(futures):
             future.result()
 
@@ -196,7 +272,7 @@ if initiate_db:
     arxiv_retriever(message, n_results=10)
 
 # %% [markdown]
-# ### read pdf
+# ### read pdfs
 
 # %%
 def check_reasoning(reason, summary):
@@ -262,11 +338,11 @@ def chunk_pdf(url, title):
 
 
 """
-This `get_pdf` function is designed to download a PDF from a given URL, extract its content, 
+This `get_pdfss` function is designed to download a PDF from a given URL, extract its content, 
 partition the content into chunks based on titles, and then initiate a chat to share and memorize 
 each chunk of the article with a teachable agent and a user.
 """
-def get_pdf(urls: Annotated[List[str], "The list of URLs of the papers to read."],
+def get_pdfs(urls: Annotated[List[str], "The list of URLs of the papers to read."],
             reasons: Annotated[List[str], "The list of reasons for reading the papers. it should be same size as urls list."]
             ) -> str:
     
@@ -275,13 +351,9 @@ def get_pdf(urls: Annotated[List[str], "The list of URLs of the papers to read."
     message = ''
     for url in urls:
 
-        paper_id = url.split('/')[-1].replace('.pdf', '')
-        search_by_id = arxiv.Search(id_list=[paper_id])
-        paper = list(arxiv.Client().results(search_by_id))[0]
-        title = paper.title
-        updated = paper.updated
-        summary = paper.summary
-        title = f"{title} [{url}] updated {updated}"
+        title, link, updated, summary, pdf_url, paper_id, _ = get_paper_metadata(url)
+        
+        title = f"{title} [{pdf_url}] updated {updated}"
         
         check_reason = check_reasoning(reasons[urls.index(url)], summary)
         if 'no' in check_reason.lower():
@@ -293,15 +365,15 @@ def get_pdf(urls: Annotated[List[str], "The list of URLs of the papers to read."
         with open(f'{Project_dir}/read_papers.pkl', 'rb') as f:
             read_papers = pickle.load(f)
 
-        if url in read_papers: 
+        if pdf_url in read_papers: 
             print(f"The article, '{title}', has already been read and shared with you in your memory.")
             message += f"The article, '{title}', has already been read and shared with you in your memory.\n"
             continue
         else:
-            urls_list.append(url)
+            urls_list.append(pdf_url)
             titles_list.append(title)
 
-        read_papers.append(url)
+        read_papers.append(pdf_url)
         with open(f'{Project_dir}/read_papers.pkl', 'wb') as f:
             pickle.dump(read_papers, f)
 
@@ -324,50 +396,373 @@ args = {
 }
 if initiate_db:
     for i in range(0, len(args['urls']), 5):
-        get_pdf(args['urls'][i:i+5], args['reasons'][i:i+5])
+        get_pdfs(args['urls'][i:i+5], args['reasons'][i:i+5])
         
-# get_pdf(**args)
+# get_pdfs(**args)
+
+# %% [markdown]
+# ### read pdf
+
+# %%
+with open(f'{Project_dir}/read_papers.pkl', 'rb') as f:
+        read_papers = pickle.load(f)
+
+len(read_papers)
+
+
+
+# %%
+PartChoice = Literal['summary', 'full']
+
+def _momorized_paper_summary(title, updated, summary, pdf_url, authors):
+
+    # Create a TeachableAgent and UserProxyAgent to represent the researcher and the user, respectively.
+    arxiver, arxiver_user = create_teachable_groupchat("arxiver", "arxiver_user", db_dir, config_list, verbosity=0)
+    try:
+        arxiver_user.initiate_chat(arxiver,
+                        silent=True,
+                        message=f"MEMORIZE_ARTICLE: \n\n '{title}' by {authors} updated on {updated}: {pdf_url} \nsummary: {summary} \n?")
+        
+        return f"Title: {title} Authors: {authors} URL: {pdf_url} os added to MEMOS\n\n "
+    except Exception as e:
+        print(f"Error: {e}")
+
+def get_pdf(url: Annotated[str, "The URL of the paper to read."],
+            reason: Annotated[str, "reason for reading the paper."],
+            part: Annotated[PartChoice, "choose do you need entire paper ('full') or a summary is enough."],
+            ) -> str:
+
+    message = ''
+    title, link, updated, summary, pdf_url, paper_id, authors= get_paper_metadata(url)
+
+    if part == 'summary':
+        _momorized_paper_summary(title, updated, summary, pdf_url, authors)
+        return f"Title: {title} Authors: {authors} URL: {pdf_url} \n\n Summary: {summary}"
+
+    title = f"{title} [{pdf_url}] updated {updated}"
+        
+    # add url to list of papers in pickle file if it doesn't exist
+    with open(f'{Project_dir}/read_papers.pkl', 'rb') as f:
+        read_papers = pickle.load(f)
+
+    if pdf_url in read_papers: 
+        print(f"The article, '{title}', has already been read and shared with you in your memory.")
+        message += f"The article, '{title}', has already been read and shared with you in your memory.\n"
+        paper_in_memo = True
+    else:
+        check_reason = check_reasoning(reason, summary)
+        if 'no' in check_reason.lower():
+            return f"The article, '{title}', does not meet the criteria for reading."
+            
+        read_papers.append(pdf_url)
+        with open(f'{Project_dir}/read_papers.pkl', 'wb') as f:
+            pickle.dump(read_papers, f)
+        chunk_pdf(pdf_url, title)
+
+    pdf_filename = f"{get_paper_id(pdf_url)}.pdf"
+    pdf_path = os.path.join(output_dir, pdf_filename)
+
+    elements = partition_pdf(filename=pdf_path)
+    chunked_elements = chunk_by_title(elements)
+
+    # find checked_elemnt that includes "REFERENCES" in the second half of the text
+
+    half_length = len(chunked_elements) // 2
+    for i, chunk in enumerate(chunked_elements[half_length:], start=half_length):
+        chunk_text_upper = chunk.text.upper()
+        if re.search(r'\bREFERENCE\b', chunk_text_upper) or re.search(r'\bREFERENCES\b', chunk_text_upper):
+            chunked_elements = chunked_elements[:i]
+            break
+
+    return "\n\n".join([str(el) for el in chunked_elements])
+
+# Example usage
+# get_pdf("http://arxiv.org/pdf/2312.01090v2", "Verify study findings on LLM-based agents in wargames.")
+
+
+# %% [markdown]
+# ### factual check
+
+# %%
+def url_check(paper_url: Annotated[str, "The URL of the paper to check."],
+            paper_title: Annotated[str, "The title of the paper to be used for fact checking."],
+            ):
+    if paper_url.find('arxiv.org') == -1:
+        return False, f"The provided paper URL, {paper_url}, is not from arxiv.org. Please provide a valid arxiv URL."
+
+    title, link, updated, summary, pdf_url, paper_id, _ = get_paper_metadata(paper_url)
+    if title != paper_title:
+        return False, f"The provided paper URL, {paper_url}, is not for the paper titled '{paper_title}'. Please provide a valid arxiv URL for the paper."
+    
+    return True, f"The provided paper URL is from arxiv.org and is for the paper titled '{paper_title}'."
+
+def factual_check(text: Annotated[str, "The writer text to be factually checked."],
+                    paper_title: Annotated[str, "The title of the paper to be used for fact checking."],
+                    paper_url: Annotated[str, "The arxiv URL of the paper to be used for fact checking."],
+                    reason: Annotated[str, "The reason for reading the paper."],
+                    paper_authors: Annotated[Optional[str], "The authors of the paper to be used for fact checking."]=None,
+                    ) -> str:
+    
+    url_check_res, message = url_check(paper_url, paper_title)
+    if not url_check_res:
+        return message
+
+    paper_content = get_pdf(paper_url, reason, part='full')
+    factual_checker_prompt = """
+Below, you will find a passage labeled "TEXT" that references a specific paper: '{paper}' alongside its corresponding "PAPER_CONTENT." Your task is to read the "PAPER_CONTENT" and verify the factual accuracy of the "TEXT" as it pertains to the paper.
+
+Once you have assessed the factual accuracy, you MUST provide feedback, begining with 'FEEDBACK:'. Following your assessment, please write a summary of the paper. Begin this summary with 'Summary of {paper}: '
+
+TEXT:
+{text}
+
+PAPER_CONTENT:
+{paper_content}
+"""
+
+    # Start by instantiating any agent that inherits from ConversableAgent.
+    factual_checker = autogen.AssistantAgent(
+        name="factual_checker",  # The name is flexible, but should not contain spaces to work in group chat.
+        llm_config={"config_list": config_list, "timeout": 120, "cache_seed": None},  # Disable caching.
+        system_message = "You are a factual_check AI assistant. You are responsible for verifying the factual accuracy of the text provided in relation to the paper content."
+        )
+
+    # create a UserProxyAgent instance named "user_proxy"
+    factual_checker_user = autogen.UserProxyAgent(
+        name="factual_checker_user",
+        human_input_mode="NEVER",
+        is_termination_msg=termination_msg,
+        code_execution_config=False,
+    )
+
+    if paper_authors:
+        paper = f"{paper_title} [{paper_url}] by {', '.join(list(paper_authors.split(',')))}"
+    else:
+        paper = f"{paper_title} [{paper_url}]"
+    chat = factual_checker_user.initiate_chat(factual_checker, silent=False, max_turns=1,
+                                              message=factual_checker_prompt.format(text=text, paper_content=paper_content, paper=paper))
+
+    return chat.chat_history[-1]['content']
+
+args = [
+    {
+        "text": "In education, they personalize learning by providing interactive learning experiences and human-centered learning analytics (Raji et al., 2023; Alfredo et al., 2023).",
+        "paper_title": "Human-Centred Learning Analytics and AI in Education: a Systematic Literature Review",
+        "paper_url": "http://arxiv.org/pdf/2312.12751v1",
+        "reason": "Verify the claims about LLMs personalizing learning in education through interactive experiences and analytics"
+    },{
+        "text": "Models such as the GPT series, BERT, and others, educated on vast corpuses of text from the internet and other sources, possess an unprecedented capability to understand, interpret, and generate human-like text.", 
+        "paper_title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding", 
+        "paper_url": "http://arxiv.org/abs/1810.04805", 
+        "reason": "To confirm the capabilities of the BERT model as mentioned in the blog section."
+    },{
+        "text": "The GPT series, which includes models like GPT-3 and potentially GPT-4, have been trained to generate human-like text and can perform a variety of language-based tasks.", 
+        "paper_title": "Language Models are Unsupervised Multitask Learners", 
+        "paper_url": "https://openai.com/research/language-models", 
+        "reason": "To verify the characteristics of GPT series models as described in the blog section."
+    },{
+        "text": "In healthcare, LLMs like ClinicalBERT assist in diagnostic processes.", 
+        "paper_title": "ClinicalBERT: Modeling Clinical Notes and Predicting Hospital Readmission", 
+        "paper_url": "http://arxiv.org/abs/1904.05342", 
+        "reason": "To check the application and accuracy of ClinicalBERT in diagnostic processes within the healthcare sector as outlined in the blog section."
+    },{
+        "text": "Risks such as the generation of misleading information, privacy breaches, or the misuse in fabricating deepfakes are concerns with the widespread deployment of LLMs.",
+        "paper_title": "Dive into Deepfakes: Detection, Attribution, and Ethics",
+        "paper_url": "http://arxiv.org/abs/2004.13745", 
+        "reason": "To validate the concerns related to the generation of misleading information and deepfakes by LLMs as mentioned in the blog section."
+    }
+]
+
+
+# factual_check(**args[1])
 
 # %% [markdown]
 # ## Define Agents
 
 # %%
-BLOG_EDITOR = """
-You are now in a group chat designated to complete a task with other participants. As the blog editor, your role is to orchestrate the process of writing a blog post, ensuring that it is data-driven and well-structured. 
-You will lead the writer team, distributing the tasks and guiding them to produce cohesive content that aligns with the given topic. Your primary responsibilities are as follows:
 
-- Analyze the given topic and identify key points that need to be addressed in the blog post.
-- Divide the blog post into several coherent sections, providing a clear \"brief\" to the Data Research Writer about what content should be included in each part.
-- Ensure that each section of the blog post references the data obtained from the database to maintain a data-driven approach.
-- Review the contributions from the writers, check for accuracy, coherence, and engagement, and ensure they adhere to the assigned brief.
-- If you encounter any problems or uncertainties, such as missing data or technical issues, you should openly express your doubts in the group chat. If these cannot be resolved promptly and you find yourself confused, it is appropriate to ask for help from the group chat manager.
-- The group chat manager may intervene to select another participant to assist or to provide further guidance on the task at hand.
-- Maintain open communication with the team for feedback and updates on the progress of each section of the blog post.
-- Continue with this collaborative discussion until the task is considered complete. Once you and your team agree that the blog post meets all necessary criteria and is ready for publication, one of you should reply with \"TERMINATE\" to signify the conclusion of the task.
 
-Please note that the position does not require programming or developer skills, so you should not be expected to execute code. Your expertise lies within content creation, data analysis, and team management to ensure the delivery of a quality blog post based on the provided database information.
+# %% [markdown]
+# ## add functions to agents
+
+# %%
+funcs = [
+    ("arxiv_retriever", arxiv_retriever, "Retrieve summeries of papers from arxiv for give query."),
+    ("get_pdfs", get_pdfs, "Retrieve the content of the pdf files from the urls list."),
+    ("get_pdf", get_pdf, "Retrieve the content of the pdf file from the url."),
+    ("factual_check", factual_check, "Check the factual accuracy of a given text based on a paper."),
+    ("arxiv_search", arxiv_search, "retrun the pdf url from arxiv for the given paper title."),
+]
+
+
+def add_func_to_agents(assignments, funcs=funcs):
+
+    # example input 
+    # assignments = [(assistants, users, "arxiv_retriever"), (assistants, users, "get_pdfs") ]
+    # funcs = [("arxiv_retriever", arxiv_retriever, "Retrieve content for question answering from arxiv."),
+    #          ("get_pdfs", get_pdfs, "Retrieve the content of the pdf file from the url.")]
+
+    func_dict = {}
+    func_disc_dict = {}
+    for func_name, func, func_disc in funcs:
+        func_dict[func_name] = func
+        func_disc_dict[func_name] = func_disc
+
+    for assignment in assignments:
+        caller, executor, func_name = assignment
+        autogen.agentchat.register_function(
+            func_dict[func_name],
+            caller=caller,
+            executor=executor,
+            name=func_name,
+            description=func_disc_dict[func_name]
+        )
+
+
+    return f"Functions {', '.join([func_name for func_name, _, _ in funcs])} are added to the agents."
+
+# %% [markdown]
+# ### Write sections
+
+# %%
+Section_writer_SP = """
+You are now part of a group chat dedicated to completing a collaborative blog project. As a data_research_writer, your role is to develop a well-researched section of a blog post on a specified topic. You will follow a detailed brief that outlines the necessary content for each part of the section.
+
+Guidelines:
+
+1. Ensure all content is thoroughly researched and supported by data from our database. Verify all information using the MEMOS tool to confirm accuracy and completeness.
+2. Each draft segment must include citations. Please list the title, URL, and authors of each cited paper at the end of your section.
+3. If you encounter any uncertainties or need clarification, contact the group chat manager for immediate assistance. Additional help from other participants may be provided if necessary.
+4. Your responsibilities include maintaining strong communication, showcasing precise research skills, paying meticulous attention to detail, and proactively seeking assistance when needed.
+5. Incorporate any team feedback into your revisions promptly. This is crucial to ensure that the final text is polished and meets our editorial standards.
+
+Formatting Requirements:
+
+Start your text with 'TXT:' and end with 'END_TXT'. This format is crucial for the group chat manager to accurately identify your contributions.
+You MUST mention the listion of citation at enad of your section and each citation MUST include the title of the paper, its URL, and authors.
+Upon completing your section, integrating all feedback, and ensuring all parts are reviewed and properly referenced, signify your completion by typing "TERMINATE" in the group chat.
 """
+
+section_content_reviwer_sp = """
+You are now in a group chat tasked with completing a specific project. As a Content Review Specialist, your primary goal is to ensure the quality, accuracy, and integrity of the content produced by the data_research_writer, aligning with the data from our database. Your responsibilities include:
+
+1. Overseeing the structure and content of the blog post to ensure each section is well-defined and adheres to the overarching theme.
+2. Collaborating closely with the Writer to understand the breakdown and specific requirements of the blog text.
+3. Reviewing drafts with the Writer to confirm factual accuracy, high-quality writing, and inclusion of references to pertinent data in the database. Utilize the 'factual_check' function to verify all textual references. Calling 'factual_check' function, provide you with a summery of the paper, please print the summeries afer your feedbacks.
+4. Cross-checking content against your MEMOS to identify any discrepancies or missing data, requesting updates from the manager if necessary.
+5. Offering constructive feedback to the writers and ensuring revisions are made swiftly to adhere to the publishing timeline.
+6. Ensuring content integrity by verifying proper citations and the use of credible sources.
+7. Seeking clarification or assistance from the group chat manager if uncertainties or confusion arise during the review process, allowing for additional participant support if needed.
+8. Motivating the writing team to conclude the task only when the content meets all quality standards and fully satisfies the task requirements. Participants should signal the completion of their roles by typing "TERMINATE" in the group chat to indicate that the review process is concluded and the blog post is ready for publication.
+"""
+
+def write_section(title: Annotated[str, "The title of the section."], 
+                  brief: Annotated[str, "a clear, detailed brief about what section should be included."],
+                  silent: Annotated[bool, "it should be always True."]=True
+                  ) -> str:
+    
+    # Start by instantiating any agent that inherits from ConversableAgent.
+    data_research_writer = autogen.AssistantAgent(
+        name="data_research_writer",  # The name is flexible, but should not contain spaces to work in group chat.
+        llm_config={"config_list": config_list, "timeout": 120, "cache_seed": None},  # Disable caching.
+        system_message=Section_writer_SP,
+        description="data_research_writer, crafts detailed sections of a blog post based on a specific topic outlined in a brief. They ensure content is well-researched, referenced, and integrates database information."
+    )
+
+    # create a UserProxyAgent instance named "user_proxy"
+    writer_user = autogen.UserProxyAgent(
+        name="writer_user",
+        human_input_mode="NEVER",
+        is_termination_msg=termination_msg,
+        code_execution_config={
+            "work_dir": "section_writing",
+            "use_docker": False,
+        },
+    )
+
+    content_review_specialist = autogen.AssistantAgent(
+                                    name="content_review_specialist",
+                                    is_termination_msg=termination_msg,
+                                    system_message=section_content_reviwer_sp, 
+                                    llm_config=llm_config,
+                                    description="The content review specialist is a critical thinker who ensures the accuracy and quality of information shared within the group chat. This individual should possess strong analytical skills to review previous messages for errors or misunderstandings and must be able to articulate the correct information effectively. Additionally, if the role involves reviewing Python code, the specialist should also have a solid understanding of Python to provide corrected code when necessary."
+                                )
+    
+    teachability = Teachability(
+                                verbosity=0,  # 0 for basic info, 1 to add memory operations, 2 for analyzer messages, 3 for memo lists.
+                                reset_db=False,
+                                path_to_db_dir=db_dir,
+                                recall_threshold=recall_threshold,  # Higher numbers allow more (but less relevant) memos to be recalled.
+                            )
+
+    # Now add the Teachability capability to the agent.
+    teachability.add_to_agent(data_research_writer)
+    teachability.add_to_agent(content_review_specialist)
+
+    add_func_to_agents([(content_review_specialist, writer_user, "arxiv_retriever"), 
+                        (content_review_specialist, writer_user, "factual_check"),
+                        (content_review_specialist, writer_user, "arxiv_search"),
+                        (content_review_specialist, writer_user, "get_pdf"),
+                        ])
+
+    groupchat = autogen.GroupChat(
+        agents=[data_research_writer, writer_user, content_review_specialist],
+        messages=[],
+        speaker_selection_method="auto",  # With two agents, this is equivalent to a 1:1 conversation.
+        allow_repeat_speaker=True,
+        max_round=max_round,
+    )
+
+    manager = autogen.GroupChatManager(
+                groupchat=groupchat,
+                is_termination_msg=termination_msg,
+                llm_config=manager_config,
+                code_execution_config={
+                    "work_dir": "coding",
+                    "use_docker": False,
+                },
+            )
+
+    chat_hist = writer_user.initiate_chat(manager, silent=silent, message=f"Compose a blog section with the following guidelines: \n\n Title: {title}, \n\n Brief: {brief} \n\n Please ensure your writing aligns closely with the brief provided, capturing the essence of the topic while engaging the reader. The section should be coherent, well-structured, and reflective of the main themes outlined in the brief.")
+    # prepare the response\n",
+    writer_messages = [mes for mes in chat_hist.chat_history if 'TXT:' in mes['content']]
+    
+    return writer_messages[-1]['content'] if writer_messages else "No response from the writer."
+
+
+funcs.append(("write_section", write_section, "Write a section of a blog post based on a given title and brief."))
+
+arg = [
+    {"title": "Introduction: The Critical Role of Large Language Models in AI", "brief": "Outline the significance of Large Language Models (LLMs) in the contemporary AI landscape, touching upon their applications across various sectors. Highlight why ensuring their reliability and safety is paramount given their widespread utility."},
+    {"title": "Unpacking Reliability and Safety: Why It Matters for LLMs", "brief": "Define reliability and safety in the context of AI and LLMs. Use recent incidents or studies to illustrate the consequences of unreliable or unsafe AI systems."},
+    {"title": "Methodological Advances in Reliability and Safety", "brief": "Describe at least three recent methodologies aimed at enhancing the safety and reliability of AI systems, specifically LLMs. Reference original papers and incorporate summaries of their findings, ensuring the explanation is accessible to the layperson."},
+    {"title": "Case Study: Component Fault Trees and Their Application", "brief": "Provide a detailed analysis of the 'Component Fault Trees' methodology using the referenced paper by Kai Hoefig et al. Discuss the benefits and drawbacks and how this methodology can be applied to LLMs."},
+    {"title": "Current Challenges and Risks in LLM Safety", "brief": "Outline current risks and challenges, such as adversarial attacks, by referencing recent studies and empirical findings relevant to LLMs. Explain how these challenges complicate the quest for reliable and safe AI systems."},
+    {"title": "Promising Solutions: Adversarial Prompt Shield and Ethical Directives", "brief": "Discuss the 'Adversarial Prompt Shield' as a highlighted solution, providing details of the BAND datasets and how adversarial examples enhance LLM safety. Additionally, address the impact of ethical directives on data set generation."},
+    {"title": "The Alignment Problem: Safeguarding the Future of AI", "brief": "Based on the work by Raphaël Millière, assess the alignment problem for LLMs, examining how tailoring AI systems to align with human values is both a current issue and a future challenge."},
+    {"title": "Evaluating LLMs for Safety: Benchmarks and Protocols", "brief": "Present the importance of comprehensive safety assessments for LLMs, suggest how benchmarks such as NewsBench can play a role, and describe the proposed safety assessment benchmark with its issue taxonomy."},
+    {"title": "Conclusion: The Ongoing Journey Toward Safer AI", "brief": "Consolidate the earlier sections into a conclusive outlook, emphasizing the continuous effort required to balance AI capabilities with safety assurances. Inspire readers to engage with further research and advancements."}, 
+    {"title": "References", "brief": "Compile all the cited research papers, articles, and studies mentioned throughout the blog post, providing a resourceful reference list for readers."}
+]
+# write_section(**arg[1])
+
+# %% [markdown]
+# ### editorial planning
+
+# %%
 # If you discover that some data is missing during your research, it is your responsibility to initiate a request to fill in the gaps by using the \"arxiv_retriever\" function to enrich the database.
-# If a complete review of a paper is necessary, use the \"get_pdf\" function to access the document. This will enable you to provide detailed insights and ensure the accuracy of the information presented in the blog post.
+# If a complete review of a paper is necessary, use the \"get_pdfs\" function to access the document. This will enable you to provide detailed insights and ensure the accuracy of the information presented in the blog post.
 
-RESEARCHER_WRITER = """
-You are now in a group chat. You need to complete a task with other participants. As a data_research_writer for the blog project, your role is to assist in crafting a comprehensive blog post on a given topic, ensuring that the content is well-researched and supported by data.
-You are equipped with MEMOS. Your primary task is to verify your MEMOS to make sure you have enough knowledge for the give task.
-The editor will provide you with a clear framework for the blog post, dividing the text into several sections and giving detailed instructions on what content each part should cover. Your job is to diligently follow this structure, producing well-written segments that seamlessly integrate the required information from the database.
-Each portion of the blog post you draft must be thoroughly reviewed and include references to the data that support the facts. This is crucial for maintaining the credibility and accuracy of the information presented to the readers.
-If you encounter any uncertain situations or confusion, feel free to reach out to the group chat manager for clarification or additional guidance. The manager may also allocate another participant to assist if necessary.
-The key aspects of your position involve strong communication, research acumen, attention to detail, and the ability to seek help when needed. Remember, the collective aim is to contribute to a well-structured, informative blog post that meets the editorial standards and provides valuable insights to the audience.
-Once you believe that the task has been satisfactorily completed, and all parts of the blog post are written, reviewed, and appropriately referenced, please signify the end of your participation by replying \"TERMINATE\" in the group chat.
-"""
+# 1. Ensure all content is thoroughly researched and supported by data from our database. Verify all information using the MEMOS tool to confirm accuracy and completeness.
 
 CONTENT_REVIEWER = """
-You are now in a group chat. You need to complete a task with other participants. As a Content Review Specialist, your main objective is to ensure the quality, accuracy, and integrity of the blog content produced by the writer, in line with the data provided in the database. You will:
+You are now in a group chat. You need to complete a task with other participants. As a Content Review Specialist, your main objective is to ensure the quality, accuracy, and integrity of the content produced by the data_research_writer, in line with the data provided in the database. You will:
 
 1. Oversee the structure and content of the blog post to ensure each section is well-defined and adheres to the overall topic.
 2. Collaborate with the Writer to understand the division of the blog text and the specific requirements for each part.
 3. Work with the writer to review the drafts, ensuring that the content is factually correct, well-written, and includes references to the relevant data in the database.
 4. Cross-verify the content against your MEMOS to identify any missing data or discrepancies. If some data is missing, ask manager to update you MEMO
-5. If a complete review of a paper is necessary, use the \"get_pdf\" function to access the document, enabling you to provide detailed and informed feedback to the writer.
+5. If a complete review of a paper is necessary, use the 'get_pdf' function to access the document, enabling you to provide detailed and informed feedback to the writer.
 6. Provide constructive feedback to the writers, ensuring any revisions are completed promptly to maintain the publishing schedule.
 7. Uphold the integrity of the content by checking for proper citations and the use of verifiable sources.
 8. If uncertainty or confusion arises during the review process, do not hesitate to ask for clarification or assistance from the group chat manager so that another participant may step in to support.
@@ -382,245 +777,256 @@ You MUST rephrase research questions into a list of queries (at least 5) for the
 
 
 # %%
-##########################################################################
-# create a group chat to collect data
+BLOG_EDITOR = """
+You are now part of a group chat dedicated to completing a collaborative task. As the blog editor, your role is pivotal in overseeing the creation of a data-driven, well-structured blog post. You will lead the writer team, guiding them to produce cohesive content that adheres to the specified topic. Your key responsibilities are outlined below:
 
-researchCoordinator = autogen.AssistantAgent(
-    name="ResearchCoordinator",
-    is_termination_msg=termination_msg,
-    system_message=COORDINATOR,  # COORDINATOR should be a predefined string variable
-    llm_config=llm_config,
-    description="Research coordinator is the person who rephrase research questions into key word queries for the arxiv api."
-)
+Analyze the Topic: Thoroughly assess the given topic to identify crucial points that the blog post must address.
+Structure the Content: Segment the blog post into coherent sections. Collaborate with a critic to ensure the quality of the blog post's outline and provide clear briefs to the Data Research Writers detailing the content required for each part.
+Coordinate with Writers: Collect drafts from the Data Research Writers and work with the Chief Writer to integrate these into the final blog post.
+Handle Uncertainties: Proactively address any issues such as missing data or technical challenges by discussing them in the group chat. If these issues persist, seek further assistance from the group chat manager.
+Facilitate Communication: Maintain open and regular communication for feedback and updates, ensuring the progress of the blog post is clear and transparent to all team members.
+Please note: This role focuses on content creation, data analysis, and team management, and does not require programming or developer skills. Your expertise is essential for the successful delivery of a high-quality blog post.
 
-critics = autogen.AssistantAgent(
-    name="critics",
-    is_termination_msg=termination_msg,
-    system_message="critics",
-    llm_config=llm_config,
-    description="critics is the person who review the queries to ensure that they are well phrased and cover the key aspects of the research questions."
-)
+Formatting Requirements:
 
-# create a UserProxyAgent instance named "user_proxy"
-RC_userproxy = autogen.UserProxyAgent(
-    name="RC_userproxy",
-    human_input_mode="NEVER",
-    is_termination_msg=termination_msg,
-    code_execution_config={
-        "work_dir": "ResearchCoordinator",
-        "use_docker": False,
-    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
-    description="assist Research coordinator to query for the arxiv api."
-)
+Your response MUST be always included an outline of the blog post. The outline should be structured with clear headings and subheadings that reflect the main points of the blog post.
+you MUST start the outline with 'OUTLINE:' and end with 'END_OUTLINE', the outline should be itemized with each item starting with a number followed by a 'TITLE:' and 'BRIEF:'.
+Replay 'TERMINATE', when you done by outlining the blog post.
+"""
+CRITICS_SP = """
+As a critic, your role is integral to refining the content quality and structure of our blog post. Working closely with the blog editor, your responsibilities include:
 
-autogen.agentchat.register_function(
-        arxiv_retriever,
-        caller=researchCoordinator,
-        executor=RC_userproxy,
-        name="arxiv_retriever",
-        description="Retrieve content for question answering from arxiv."
-    )
-
-groupchat = autogen.GroupChat(
-    agents=[researchCoordinator, RC_userproxy, critics],
-    messages=[],
-    speaker_selection_method="auto",  # With two agents, this is equivalent to a 1:1 conversation.
-    allow_repeat_speaker=False,
-    max_round=3,
-)
-
-manager = autogen.GroupChatManager(
-    groupchat=groupchat,
-    is_termination_msg=termination_msg,
-    llm_config=manager_config,
-    code_execution_config={
-        "work_dir": "coding",
-        "use_docker": False,
-    },
-)
-
-
-##########################################################################
-# writer and content reviewer
-
-editor = autogen.AssistantAgent(
-    name="editor",
-    is_termination_msg=termination_msg,
-    system_message=BLOG_EDITOR,
-    llm_config=llm_config,
-    description="The blog editor is admin,  a detail-oriented individual with strong language and communication skills, possessing a solid understanding of the blog's thematic content and target audience. They should have the ability to critically evaluate written content and user-submitted messages or posts for accuracy, clarity, and relevance, and must be capable of offering constructive feedback or alternative text to enrich the discussion. While they need not be coding experts, some basic Python skills would be beneficial to troubleshoot or rectify any issues with code snippets shared within the group chat."
-)
-
-data_research_writer = autogen.AssistantAgent(
-    name="data_research_writer",
-    is_termination_msg=termination_msg,
-    system_message=RESEARCHER_WRITER, 
-    llm_config=llm_config,
-    description="Data Research Writer is a role that entails strong analytical skills, the ability to research complex topics, and synthesize findings into clear, written reports. This position should possess excellent written communication skills, attention to detail, and the competency to question and verify information, including identifying issues with data or inconsistencies in previous messages. While not primarily a programmer, the role demands some familiarity with Python to assess and potentially correct code related to data analysis in group discussions."
-)
-
-content_review_specialist = autogen.AssistantAgent(
-    name="content_review_specialist",
-    is_termination_msg=termination_msg,
-    system_message=CONTENT_REVIEWER, 
-    llm_config=llm_config,
-    description="The content review specialist is a critical thinker who ensures the accuracy and quality of information shared within the group chat. This individual should possess strong analytical skills to review previous messages for errors or misunderstandings and must be able to articulate the correct information effectively. Additionally, if the role involves reviewing Python code, the specialist should also have a solid understanding of Python to provide corrected code when necessary."
-)
-
-# Instantiate the Teachability capability. Its parameters are all optional.
-teachability = Teachability(
-    verbosity=0,  # 0 for basic info, 1 to add memory operations, 2 for analyzer messages, 3 for memo lists.
-    reset_db=False,
-    path_to_db_dir=db_dir,
-    recall_threshold=1.3,  # Higher numbers allow more (but less relevant) memos to be recalled.
-)
-
-# Now add the Teachability capability to the agent.
-teachability.add_to_agent(data_research_writer)
-teachability.add_to_agent(content_review_specialist)
-teachability.add_to_agent(editor)
-
-inner_user = autogen.UserProxyAgent(
-    name="inner_user",
-    human_input_mode="NEVER",
-    is_termination_msg=termination_msg,
-    code_execution_config={
-        "last_n_messages": 1,
-        "work_dir": "tasks",
-        "use_docker": False,
-    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
-)
-
-editor_user = autogen.UserProxyAgent(
-    name="editor_user",
-    human_input_mode="NEVER",
-    is_termination_msg=termination_msg,
-    code_execution_config={
-        "last_n_messages": 1,
-        "work_dir": "tasks",
-        "use_docker": False,
-    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
-)
-
-# autogen.agentchat.register_function(
-#     get_pdf,
-#     caller=data_research_writer,
-#     executor=inner_user,
-#     name="get_pdf",
-#     description="Retrieve the content of the pdf files from the urls."
-# )
-
-for func, func_name, description in zip([arxiv_retriever, get_pdf],
-                                        ["arxiv_retriever", "get_pdf"],
-                                        ["Retrieve content for question answering from arxiv.", 
-                                         "Retrieve the content of the pdf file from the url."] ):
-    for caller, executor in zip([content_review_specialist, researchCoordinator],
-                                [inner_user, editor_user]):
-        autogen.agentchat.register_function(
-                func,
-                caller=caller,
-                executor=executor,
-                name=func_name,
-                description=description
-            )
-        
-editor_groupchat = autogen.GroupChat(
-    agents=[data_research_writer, editor_user, researchCoordinator],
-    messages=[],
-    speaker_selection_method="auto",  # With two agents, this is equivalent to a 1:1 conversation.
-    allow_repeat_speaker=False,
-    max_round=30,
-)
-
-editor_manager = autogen.GroupChatManager(
-    groupchat=editor_groupchat,
-    is_termination_msg=termination_msg,
-    llm_config=manager_config,
-    code_execution_config={
-        "work_dir": "coding",
-        "use_docker": False,
-    },
-)
-
-##########################################################################
-assistant = autogen.AssistantAgent(
-    name="Assistant",
-    llm_config={"config_list": config_list},
-)
-
-user = autogen.UserProxyAgent(
-    name="User",
-    human_input_mode="NEVER",
-    is_termination_msg=termination_msg,
-    code_execution_config={
-        "last_n_messages": 1,
-        "work_dir": "tasks",
-        "use_docker": False,
-    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
-)
-
-# %% [markdown]
-# ## setup nested group chat
-
-# %%
-task = """
-As a recognized authority on enhancing the reliability and safety of AI systems, you're invited to illuminate our AI community with your insights through a scientific article titled "Survey on Reliability and Safety Mechanisms in AI Systems and the most recent advancement".
-
- Your expertise will guide our audience through the nuances of ensuring AI operates within safe and reliable parameters, with a special focus on Large Language Models (LLMs). Here's how to structure your invaluable contribution:
-
-- **Core Theme:** Anchor your discussion around Large Language Models, highlighting their significance in the current AI landscape and why reliability and safety are paramount.
-
-- **Innovative Progress:** Dive into the latest breakthroughs and methodologies [at least 3 methodologies] that have emerged in the domain of AI reliability and safety. Showcase [with reference to original paper] how these advancements are shaping the future of responsible AI development and implementation.
-
-- **Accessible Insight:** While your post will be rich in information, ensure it's crafted in a manner that demystifies complex concepts for those outside the tech sphere. Your goal is to enlighten, not overwhelm.
-
-- **Credible Sources:** You MUST Strengthen your narrative by integrating references to the research, studies, and sources that informed your insights. Additionally, provide these references for readers seeking to delve deeper into the subject.
-
-- **Current Perspective:** Reflect the cutting-edge of the field by incorporating the most recent findings and research available in your database. Your post should serve as a timely resource for anyone looking to understand the state-of-the-art in AI safety and reliability mechanisms.
-
-This blog post is an opportunity to not just share knowledge but to foster a deeper understanding and appreciation for the ongoing efforts to make AI systems more reliable and safe for everyone. Your contribution will undoubtedly be a beacon for those navigating the complexities of AI in our increasingly digital world.
-You are equipped  with a function that could read a paper for you. If you need a missing info please update you knowledge base.
+Review Outlines: Examine the structure and outline of the blog post provided by the editor to ensure it logically flows and adequately covers the designated topic.
+Evaluate Content: Critically assess each section drafted by the writers for coherence, relevance, and alignment with the overall topic. Suggest improvements or modifications where necessary.
+Ensure Depth and Precision: Verify that the content is not only factually accurate but also insightful and engaging. Check for depth of analysis and argumentation within each section.
+Provide Constructive Feedback: Offer detailed feedback to the editor and writers to enhance the clarity, impact, and readability of the blog post.
+Maintain Communication: Stay active in the group chat, providing timely and actionable feedback. Collaborate effectively with the editor to address any discrepancies or gaps in content.
+Final Approval: Contribute to the final review process, ensuring that the content meets all specified criteria before publication. Recommend final adjustments if necessary.
+Your role requires a keen eye for detail and a deep understanding of content quality and structure. By providing expert critique and guidance, you help ensure the blog post is informative, engaging, and ready for a successful publication.
 """
 
+def craft_outline(task, silent=True):
+    # Start by instantiating any agent that inherits from ConversableAgent.
+    blog_editor = autogen.AssistantAgent(
+        name="blog_editor",  # The name is flexible, but should not contain spaces to work in group chat.
+        llm_config=llm_config,
+        system_message=BLOG_EDITOR,
+        description="The blog editor is central to orchestrating a collaborative blog project, leading the writer team to produce a cohesive, data-driven post. They analyze topics, structure content, coordinate contributions, and manage communications, ensuring the project adheres to editorial standards and is ready for successful publication."
+    )
+
+    critic = autogen.AssistantAgent(
+        name="critic",
+        system_message=CRITICS_SP,
+        llm_config=llm_config,
+        description="The critic collaborates with the blog editor to enhance the quality and structure of blog posts. They evaluate content, ensure depth, provide feedback, and assist in the final review to ensure the post is insightful, engaging, and publication-ready."
+    )
+
+    # create a UserProxyAgent instance named "user_proxy"
+    editor_user = autogen.UserProxyAgent(
+        name="editor_user",
+        human_input_mode="NEVER",
+        is_termination_msg=termination_msg,
+        code_execution_config=False,
+    )
+
+    teachability = Teachability(
+                                verbosity=0,  # 0 for basic info, 1 to add memory operations, 2 for analyzer messages, 3 for memo lists.
+                                reset_db=False,
+                                path_to_db_dir=db_dir,
+                                recall_threshold=recall_threshold,  # Higher numbers allow more (but less relevant) memos to be recalled.
+                            )
+
+    teachability.add_to_agent(blog_editor)
+
+    add_func_to_agents([(blog_editor, editor_user, "arxiv_retriever"), 
+                        (blog_editor, editor_user, "arxiv_search"),
+                        (blog_editor, editor_user, "get_pdf"),
+                        (blog_editor, editor_user, "get_pdfs"),
+                        (critic, editor_user, "factual_check")
+                        ])
+
+    def custom_speaker_selection_func(last_speaker: Agent, groupchat: autogen.GroupChat):
+
+        messages = groupchat.messages
+        if len(messages) <= 1:
+            # first, let the researchCoordinator retrieve relevant data populate db
+            return blog_editor
+        
+        return 'auto'
+
+    groupchat = autogen.GroupChat(
+        agents=[blog_editor, editor_user, critic],
+        messages=[],
+        speaker_selection_method=custom_speaker_selection_func,
+        allow_repeat_speaker=True,
+        max_round=max_round,
+    )
+
+    manager = autogen.GroupChatManager(
+                groupchat=groupchat,
+                is_termination_msg=termination_msg,
+                llm_config=manager_config,
+                code_execution_config={
+                    "work_dir": "coding",
+                    "use_docker": False,
+                },
+            )
+    
+
+    chat_hist = editor_user.initiate_chat(manager, silent=silent, message=task)
+    # prepare the response\n",
+    writer_messages = [mes for mes in chat_hist.chat_history if 'OUTLINE:' in mes['content']]
+    
+    return writer_messages[-1]['content'] if writer_messages else "NO outline from the editor."
+
+# outline = craft_outline(task=task, silent=False)    
+
+# %% [markdown]
+# ### chief writer
+
 # %%
-def writing_message(recipient, messages, sender, config):
-    # return f"{task} \n\n {recipient.chat_messages_for_summary(sender)[-1]['content']}"
-    return f"Your MEMOS are updated, you could start with: \n\n {task}"
+chief_writer_sp = """
+As the chief_writer, your role involves developing the final blog post based on sections received from a team of writers and an outline provided by the editor.
 
+Guidelines:
 
-nested_chat_queue_outer = [
-    {"recipient": manager, "summary_method": "reflection_with_llm"},
-    {"recipient": editor_manager, "message": writing_message, "summary_method": "last_msg", "max_turns": 10},
-    # {"recipient": content_review_specialist, "message": "Review the content provided.", "summary_method": "last_msg", "max_turns": 1},
-    # {"recipient": data_research_writer, "message": writing_message, "summary_method": "last_msg", "max_turns": 1},
-]
-assistant.register_nested_chats(
-    nested_chat_queue_outer,
-    trigger=user,
-)
+Review Drafts: Ensure each draft segment you receive includes necessary citations. At the end of your section, list each citation, including the title of the paper, its URL, and the authors.
+Seek Clarification: If you encounter any uncertainties or require further information, contact the group chat manager for immediate assistance. Additional help from other participants may be arranged if necessary.
+Communicate Effectively: Maintain strong communication, demonstrate precise research skills, and pay meticulous attention to detail. Proactively seek assistance whenever needed.
+Incorporate Feedback: Promptly integrate any team feedback into your revisions to ensure the final text is polished and meets our editorial standards.
+Formatting Requirements:
 
-nested_chat_queue_inner = [
-    # {"recipient": manager, "summary_method": "reflection_with_llm"},
-    # {"recipient": data_research_writer, "message": writing_message, "summary_method": "last_msg", "max_turns": 1},
-    {"recipient": content_review_specialist, "message": "Review the content provided.", "summary_method": "last_msg", "max_turns": 10},
-    # {"recipient": data_research_writer, "message": writing_message, "summary_method": "last_msg", "max_turns": 1},
-]
+Text Identification: Begin your text with 'TXT:' and end with 'END_TXT'. This format is essential for the group chat manager to accurately identify your contributions.
+Citation Details: Each citation must include the title of the paper, its URL, and authors. Ensure this list is complete and accurate.
+Completion:
 
-inner_user.register_nested_chats(
-    nested_chat_queue_inner,
-    trigger=data_research_writer,
-)
+Once you have integrated all feedback and ensured that all parts are reviewed and properly referenced, signify the completion of your work by typing "TERMINATE" in the group chat.
 
-# res = user.initiate_chats(
-#     [
-#         {"recipient": assistant, "message": task, "max_turns": 10, "summary_method": "last_msg"},
-#     ]
-# ) 
+"""
 
-res = editor_user.initiate_chat(editor_manager, message=task)
+prompt = """
+Compose a blog post on the designated TOPIC based on the provided CONTENT:
+
+TOPIC:
+{topic}
+
+CONTENT:
+{blog_sections}
+
+Instructions:
+
+Follow the Outline: Adhere to the structure provided in the 'CONTENT' section to ensure your blog post is organized and coherent.
+Ensure Quality: Create content that is engaging and well-articulated, maintaining a logical flow throughout the post.
+Engage the Reader: Write in a compelling manner that captures the reader's interest, making the topic accessible and appealing.
+By following these guidelines, your blog post should effectively communicate the main ideas while being structured and engaging for the audience.
+"""
+def craft_blog_post(topic, sections, silent=True):
+    chief_writer = autogen.AssistantAgent(
+        name="data_research_writer",  # The name is flexible, but should not contain spaces to work in group chat.
+        llm_config={"config_list": config_list, "timeout": 120, "cache_seed": None},  # Disable caching.
+        system_message=Section_writer_SP,
+        description="The chief writer agent orchestrates the creation of a comprehensive blog post by compiling sections from various writers. They ensure each segment is well-researched, includes proper citations, and integrates feedback. This role emphasizes strong communication, meticulous attention to detail, and proactive problem-solving to meet editorial standards."
+    )
+
+    # create a UserProxyAgent instance named "user_proxy"
+    writer_user = autogen.UserProxyAgent(
+        name="writer_user",
+        human_input_mode="NEVER",
+        is_termination_msg=termination_msg,
+        code_execution_config={
+            "work_dir": "section_writing",
+            "use_docker": False,
+        },
+    )
+
+    content_review_specialist = autogen.AssistantAgent(
+                                    name="content_review_specialist",
+                                    is_termination_msg=termination_msg,
+                                    system_message=section_content_reviwer_sp, 
+                                    llm_config=llm_config,
+                                    description="The content review specialist is a critical thinker who ensures the accuracy and quality of information shared within the group chat. This individual should possess strong analytical skills to review previous messages for errors or misunderstandings and must be able to articulate the correct information effectively. Additionally, if the role involves reviewing Python code, the specialist should also have a solid understanding of Python to provide corrected code when necessary."
+                                )
+
+    teachability = Teachability(
+                                verbosity=0,  # 0 for basic info, 1 to add memory operations, 2 for analyzer messages, 3 for memo lists.
+                                reset_db=False,
+                                path_to_db_dir=db_dir,
+                                recall_threshold=recall_threshold,  # Higher numbers allow more (but less relevant) memos to be recalled.
+                            )
+
+    # Now add the Teachability capability to the agent.
+
+    teachability.add_to_agent(content_review_specialist)
+
+    add_func_to_agents([(content_review_specialist, writer_user, "arxiv_retriever"), 
+                        (content_review_specialist, writer_user, "factual_check"),
+                        (content_review_specialist, writer_user, "arxiv_search"),
+                        (content_review_specialist, writer_user, "get_pdf"),
+                        (chief_writer, writer_user, "arxiv_search"),
+                        ])
+
+    def custom_speaker_selection_func(last_speaker: Agent, groupchat: autogen.GroupChat):
+        
+        messages = groupchat.messages
+
+        if len(messages) <= 1:
+            # first, let the researchCoordinator retrieve relevant data populate db
+            return chief_writer
+        
+        return 'auto'
+
+    groupchat = autogen.GroupChat(
+        agents=[chief_writer, writer_user, content_review_specialist],
+        messages=[],
+        speaker_selection_method=custom_speaker_selection_func,
+        allow_repeat_speaker=True,
+        max_round=max_round,
+    )
+
+    manager = autogen.GroupChatManager(
+                groupchat=groupchat,
+                is_termination_msg=termination_msg,
+                llm_config=manager_config,
+                code_execution_config={
+                    "work_dir": "coding",
+                    "use_docker": False,
+                },
+            )
+
+    chat_hist = writer_user.initiate_chat(manager, silent=silent, message=prompt.format(topic=topic, blog_sections="\n\n".join(sections)))
+    # prepare the response\n",
+    writer_messages = [mes for mes in chat_hist.chat_history if 'TXT:' in mes['content']]
+
+    return writer_messages[-1]['content'] if writer_messages else "NO response from the writer."
+
+# %% [markdown]
+# ## Orchestrator
 
 # %%
-res
+outline = craft_outline(task=task, silent=False)   
+
+secs = [sec for sec in outline.split('TITLE')][1:]
+titles = [sec.split('BRIEF')[0].strip() for sec in secs]
+briefs = [sec.split('BRIEF')[1].strip() for sec in secs]
+
+sections = []
+with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(write_section, title=title, brief=brief) for title, brief in zip(titles, briefs)]
+        for future in futures:
+            sections.append(future.result())
+
+blog_sections = "\n\n".join(f"{i}. {title} \n\n {section}" for i, (title, section) in enumerate(zip(titles, sections), start=1))
+
+# remove "TXT", "TERMINATE", "END_TXT" from the blog_sections
+blog_sections = re.sub(r'TXT:|TERMINATE|END_TXT:|TXT|END_TXT', '', blog_sections)
+print(blog_sections)
+
+
+craft_blog_post(topic=topic, sections=sections, silent=False)
+
+
+# %%
+titles
 
 # %%
 
