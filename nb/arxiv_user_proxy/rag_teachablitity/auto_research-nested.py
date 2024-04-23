@@ -1003,6 +1003,11 @@ def craft_blog_post(topic, sections, silent=True):
 # ## Orchestrator
 
 # %%
+
+# Start logging
+logging_session_id = autogen.runtime_logging.start(config={"dbname": "logs.db"})
+print("Logging session ID: " + str(logging_session_id))
+
 outline = craft_outline(task=task, silent=False)   
 
 secs = [sec for sec in outline.split('TITLE')][1:]
@@ -1024,11 +1029,4 @@ print(blog_sections)
 
 craft_blog_post(topic=topic, sections=sections, silent=False)
 
-
-# %%
-titles
-
-# %%
-
-
-
+autogen.runtime_logging.stop()
