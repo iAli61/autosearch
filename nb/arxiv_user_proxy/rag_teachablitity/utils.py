@@ -25,6 +25,48 @@ import requests
 import pickle
 import re
 from pathlib import Path
+import sqlite3
+
+# ############################# Database helper functions #########################
+def init_db(Project_dir):
+    conn = sqlite3.connect(f'{Project_dir}/papers.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS read_abstracts (
+            url TEXT PRIMARY KEY
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS read_papers (
+            url TEXT PRIMARY KEY
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def add_paper_to_db(paper_url, table_name, Project_dir):
+    conn = sqlite3.connect(f'{Project_dir}/papers.db')
+    c = conn.cursor()
+    c.execute(f"INSERT OR IGNORE INTO {table_name} (url) VALUES (?)", (paper_url,))
+    conn.commit()
+    conn.close()
+
+def check_paper_in_db(paper_url, table_name, Project_dir):
+    conn = sqlite3.connect(f'{Project_dir}/papers.db')
+    c = conn.cursor()
+    c.execute(f"SELECT url FROM {table_name} WHERE url = ?", (paper_url,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+# count the papers in the database
+def count_papers_in_db(table_name, Project_dir):
+    conn = sqlite3.connect(f'{Project_dir}/papers.db')
+    c = conn.cursor()
+    c.execute(f"SELECT COUNT(*) FROM {table_name}")
+    result = c.fetchone()
+    conn.close()
+    return result
 
 ############################ document analyzer ############################
 document_intelligence_key="837c546b16f140efa348b2b9505dc3d2"
