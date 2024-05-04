@@ -69,8 +69,8 @@ def count_papers_in_db(table_name, Project_dir):
     return result
 
 ############################ document analyzer ############################
-document_intelligence_key="837c546b16f140efa348b2b9505dc3d2"
-document_intelligence_endpoint="https://cog-fr-wdhmcxj7ki3pk.cognitiveservices.azure.com/"
+document_intelligence_key="7ccaf35ff9824f75a98d1ce8971d5a9f"
+document_intelligence_endpoint="https://docana505.cognitiveservices.azure.com/"
 
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
