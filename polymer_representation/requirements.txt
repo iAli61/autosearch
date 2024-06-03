@@ -1,4 +1,4 @@
-ipython
+ipykernel
 unstructured[all-docs]
 arxiv
 azure-ai-formrecognizer==3.3.2

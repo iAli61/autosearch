@@ -14,3 +14,5 @@ nb/arxiv_user_proxy/rag_teachablitity/pdf_output-2305-17873
 nb/arxiv_user_proxy/rag_teachablitity/log.txt
 /nb/arxiv_user_proxy/rag_teachablitity/.cache
 profiler/ml_profiler/
+*.db-shm
+*.cache/*
