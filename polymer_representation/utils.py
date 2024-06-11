@@ -73,9 +73,10 @@ document_intelligence_key="7ccaf35ff9824f75a98d1ce8971d5a9f"
 document_intelligence_endpoint="https://docana505.cognitiveservices.azure.com/"
 
 from azure.core.credentials import AzureKeyCredential
-from azure.ai.formrecognizer import DocumentAnalysisClient
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import DocumentAnalysisFeature, AnalyzeResult
 
-document_analysis_client = DocumentAnalysisClient(
+document_analysis_client = DocumentIntelligenceClient(
     endpoint=document_intelligence_endpoint,
     credential=AzureKeyCredential(document_intelligence_key),
 )
@@ -165,7 +166,10 @@ def read_pdf_content(pdf_file_path):
 
 def _analyze_and_save_pdf(document_analysis_client, pdf_content):
     # Analyze the PDF content
-    poller = document_analysis_client.begin_analyze_document("prebuilt-document", pdf_content)
+    poller = document_analysis_client.begin_analyze_document("prebuilt-document", pdf_content,
+                                                            #  features=[DocumentAnalysisFeature.FORMULAS],  # Specify which add-on capabilities to enable
+                                                             )
+    
     result = poller.result().to_dict()
 
     print("Writing results to json file...")
