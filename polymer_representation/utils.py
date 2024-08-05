@@ -27,8 +27,37 @@ import re
 from pathlib import Path
 import sqlite3
 
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+############################ document analyzer ############################
+
+
+document_intelligence_key=os.getenv("DOCUMENT_INTELLIGENCE_KEY")
+document_intelligence_endpoint=os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT")
+
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.formrecognizer import DocumentAnalysisClient
+
+document_analysis_client = DocumentAnalysisClient(
+    endpoint=document_intelligence_endpoint,
+    credential=AzureKeyCredential(document_intelligence_key),
+)
+
 # ############################# Database helper functions #########################
+
 def init_db(Project_dir):
+    """
+    Initialize the database for storing abstracts and papers.
+
+    Args:
+        Project_dir (str): The directory path where the database file will be created.
+
+    Returns:
+        None
+    """
     conn = sqlite3.connect(f'{Project_dir}/papers.db')
     c = conn.cursor()
     c.execute('''
@@ -44,7 +73,19 @@ def init_db(Project_dir):
     conn.commit()
     conn.close()
 
+
 def add_paper_to_db(paper_url, table_name, Project_dir):
+    """
+    Add a paper URL to the specified table in the database.
+
+    Args:
+        paper_url (str): The URL of the paper to be added.
+        table_name (str): The name of the table in the database.
+        Project_dir (str): The directory where the database is located.
+
+    Returns:
+        None
+    """
     conn = sqlite3.connect(f'{Project_dir}/papers.db')
     c = conn.cursor()
     c.execute(f"INSERT OR IGNORE INTO {table_name} (url) VALUES (?)", (paper_url,))
@@ -68,19 +109,7 @@ def count_papers_in_db(table_name, Project_dir):
     conn.close()
     return result
 
-############################ document analyzer ############################
-document_intelligence_key="7ccaf35ff9824f75a98d1ce8971d5a9f"
-document_intelligence_endpoint="https://docana505.cognitiveservices.azure.com/"
-
-from azure.core.credentials import AzureKeyCredential
-from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import DocumentAnalysisFeature, AnalyzeResult
-
-document_analysis_client = DocumentIntelligenceClient(
-    endpoint=document_intelligence_endpoint,
-    credential=AzureKeyCredential(document_intelligence_key),
-)
-
+############################# arxiv helper functions #########################
 def _arxiv_search(query, n_results=10):
     sort_by = arxiv.SortCriterion.Relevance
     papers = arxiv.Search(query=query, max_results=n_results, sort_by=sort_by)
@@ -116,17 +145,13 @@ def get_paper_metadata(url):
 
     return title, link, updated, summary, pdf_url, paper_id, authors
 
-
-
 def download_pdf(url, save_path):
     """Download a PDF from a given URL."""
     response = requests.get(url)
     with open(save_path, 'wb') as f:
         f.write(response.content)
 
-
-
-
+############################## Document Analyzer helper functions #########################
 
 def write_json_locally(result, output_folder, pdf_file_path):
     """
@@ -166,10 +191,7 @@ def read_pdf_content(pdf_file_path):
 
 def _analyze_and_save_pdf(document_analysis_client, pdf_content):
     # Analyze the PDF content
-    poller = document_analysis_client.begin_analyze_document("prebuilt-document", pdf_content,
-                                                            #  features=[DocumentAnalysisFeature.FORMULAS],  # Specify which add-on capabilities to enable
-                                                             )
-    
+    poller = document_analysis_client.begin_analyze_document("prebuilt-document", pdf_content)
     result = poller.result().to_dict()
 
     print("Writing results to json file...")
@@ -404,3 +426,28 @@ def create_docs(data, maxtokensize, sourcename1):
     )
     return docs, pagecontent,fullmdtext
 
+
+############################## 
+
+def pdf2md_chunck(url):
+    if url[-4:] != ".pdf":
+        pdf_filename = url.split('/')[-1] + ".pdf"
+    else:
+        pdf_filename = url.split('/')[-1]
+
+    if url.startswith("http"):
+        pdf_path = os.path.join(output_dir, pdf_filename)
+        # Download the PDF
+        download_pdf(url, pdf_path)
+    else:
+        pdf_path = url
+
+    data = analyze_and_save_pdf(f"file://{pdf_path}", f"{output_dir}/json")
+
+    docs, pagecontent, fullmdtext = create_docs(data, 3000, pdf_filename)
+
+    # write fullmdtext to a file
+    with open(f"{output_dir}/markdown/{pdf_filename}.md", "w") as f:
+        f.write(fullmdtext)
+
+    return docs

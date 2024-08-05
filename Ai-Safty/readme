@@ -1,0 +1,7 @@
+# requierments
+
+- Unstructured python: https://github.com/Unstructured-IO/unstructured?tab=readme-ov-file#installing-the-library
+  - `pip install unstructured[all-docs]`
+  - `sudo apt-get install libmagic-dev poppler-utils tesseract-ocr tesseract-lang libreoffice pandoc`
+
+- `pip install -r requirements.txt`

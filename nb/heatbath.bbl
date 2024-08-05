@@ -1,0 +1,134 @@
+\providecommand{\bysame}{\leavevmode\hbox to3em{\hrulefill}\thinspace}
+\providecommand{\MR}{\relax\ifhmode\unskip\space\fi MR }
+% \MRhref is called by the amsart/book/proc definition of \MR.
+\providecommand{\MRhref}[2]{%
+  \href{http://www.ams.org/mathscinet-getitem?mr=#1}{#2}
+}
+\providecommand{\href}[2]{#2}
+\begin{thebibliography}{10}
+
+\bibitem{Baumert2009}
+Stephen Baumert, Archis Ghate, Seksan Kiatsupaibul, Yanfang Shen, Robert~L.
+  Smith, and Zelda~B. Zabinsky, \emph{{Discrete Hit-and-Run for Sampling Points
+  from Arbitrary Distributions Over Subsets of Integer Hyperrectangles}},
+  Operations Research \textbf{57} (2009), no.~3, 727--739.
+
+\bibitem{Beck2007}
+Matthias Beck and Sinai Robins, \emph{{Computing the Continuous Discretely}},
+  Springer, New York, 2007.
+
+\bibitem{Cryan2002}
+Mary Cryan, Martin Dyer, Leslie~Ann Goldberg, Mark Jerrum, and Russell Martin,
+  \emph{{Rapidly Mixing Markov Chains for Sampling Contingency Tables with a
+  Constant Number of Rows}}, SIAM Journal on Computing \textbf{36} (2006),
+  no.~1, 247--278.
+
+\bibitem{Loera2013}
+Jes\'{u}s~A. {De Loera}, Raymond Hemmecke, and Matthias K\"{o}ppe,
+  \emph{Algebraic and {G}eometric {I}deas in the {T}heory of {D}iscrete
+  {O}ptimization}, MPS-SIAM Series on Optimization, SIAM, Cambridge, 2013.
+
+\bibitem{loera-augmentation}
+Jes{\'{u}}s~A. {De Loera}, Raymond Hemmecke, and Jon Lee, \emph{{On
+  Augmentation Algorithms for Linear and Integer-Linear Programming: From
+  Edmonds--Karp to Bland and Beyond}}, SIAM Journal on Optimization \textbf{25}
+  (2015), no.~4, 2494--2511.
+
+\bibitem{Diaconis1998a}
+Persi Diaconis and Bernd Sturmfels, \emph{{Algebraic algorithms for sampling
+  from conditional distributions}}, The Annals of statistics \textbf{26}
+  (1998), no.~1, 363--397.
+
+\bibitem{drton2008}
+Mathias Drton, Bernd Sturmfels, and Seth Sullivant, \emph{Lectures on algebraic
+  statistics}, Oberwolfach Seminars, vol.~39, Springer, Berlin, 2009, A
+  Birkh\"{a}user book.
+
+\bibitem{Dyer2014}
+Martin Dyer, Catherine Greenhill, and Mario Ullrich, \emph{{Structure and
+  eigenvalues of heat-bath Markov chains}}, Linear Algebra and its Applications
+  \textbf{454} (2014), 57--71.
+
+\bibitem{gardam2012}
+Giles Gardam, \emph{{Expander Graphs and Kazhdan' s Property (T)}}, Bachelor's
+  thesis, University of Sidney, 2012.
+
+\bibitem{hara2010}
+Hisayuki Hara, Akimichi Takemura, and Ruriko Yoshida, \emph{{On connectivity of
+  fibers with positive marginals in multiple logistic regression}}, Journal of
+  Multivariate Analysis (2010), 1--26.
+
+\bibitem{hemmecke2005}
+Raymond Hemmecke and Peter~N. Malkin, \emph{{Computing generating sets of
+  lattice ideals and Markov bases of lattices}}, Journal of Symbolic
+  Computation \textbf{44} (2009), no.~10, 1463--1476.
+
+\bibitem{Horn2013}
+Roger~A. Horn, \emph{{Matrix Analysis}}, 2nd ed., Cambridge University Press,
+  New York, 2013.
+
+\bibitem{Kim2012}
+Steven~S. Kim, \emph{{Mixing Time of a Rook's Walk}}, Undergraduate certificate
+  paper (2012).
+
+\bibitem{levin2008}
+David~A. Levin, Yuval Peres, and Elisabeth~L. Wilmer, \emph{{Markov chains and
+  mixing times}}, American Mathematical Society, Providence, RI, 2009.
+
+\bibitem{lovasz1999}
+L{\'{a}}szl{\'{o}} Lov{\'{a}}sz, \emph{{Hit-and-run mixes fast}}, Mathematical
+  Programming \textbf{86} (1999), no.~3, 443--461.
+
+\bibitem{Lovasz2006}
+L{\'{a}}szl{\'{o}} Lov{\'{a}}sz and Santosh Vempala, \emph{{Hit-and-Run from a
+  Corner}}, SIAM Journal on Computing \textbf{35} (2006), no.~4, 985--1005.
+
+\bibitem{malkin2007}
+Peter~N. Malkin, \emph{{Computing Markov bases, Gr\"{o}bner bases, and extreme
+  rays}}, Phd thesis, 2007, p.~223.
+
+\bibitem{Mcleman2015}
+Cam McLeman, Peter~T. Otto, John Rahmani, and Matthew Sutter, \emph{{Mixing
+  times for the {R}ook's walk via path coupling}}, to appear in Involve (2016),
+  1--12.
+
+\bibitem{Morris2004}
+Ben Morris and Alistair Sinclair, \emph{{Random Walks on Truncated Cubes and
+  Sampling 0-1 Knapsack Solutions}}, SIAM Journal on Computing \textbf{34}
+  (2004), no.~1, 195--226.
+
+\bibitem{potka2013}
+Samu Potka, \emph{{Higher connectivity of fiber graphs of Gr\"{o}bner bases}},
+  Journal of Algebraic Statistics \textbf{4} (2013), no.~1, 93--107.
+
+\bibitem{Rauh2014}
+Johannes Rauh and Seth Sullivant, \emph{Lifting {M}arkov bases and higher
+  codimension toric fiber products}, Journal of Symbolic Computation
+  \textbf{74} (2016), 276--307.
+
+\bibitem{Sebo1990}
+Andr{\'{a}}s Seb{\"{o}}, \emph{{Hilbert Bases, Caratheodory's Theorem and
+  Combinatorial Optimization}},  (1990), 431--455.
+
+\bibitem{Sinclair1992}
+Alistair Sinclair, \emph{{Improved Bounds for Mixing Rates of Markov Chains and
+  Multicommodity Flow}}, Combinatorics, Probability and Computing \textbf{1}
+  (1992), no.~4, 351--370.
+
+\bibitem{Sturmfels1996}
+Bernd Sturmfels, \emph{{Gr{\"{o}}bner bases and convex polytopes}}, American
+  Mathematical Society, Providence, R.I., 1996.
+
+\bibitem{sullivant2003}
+Seth Sullivant, \emph{{Markov bases of binary graph models}}, Annals of
+  Combinatorics \textbf{7} (2003), 441--466.
+
+\bibitem{Vempala2005}
+Santosh~S. Vempala, \emph{{Geometric Random Walks: A Survey}}, MSRI
+  Combinatorial and Computational Geometry \textbf{52} (2005), 573--612.
+
+\bibitem{windisch2015-mixing}
+Tobias Windisch, \emph{{Rapid mixing and Markov bases}}, preprint,
+  arXiv:1505.03018 (2015), 1--18.
+
+\end{thebibliography}

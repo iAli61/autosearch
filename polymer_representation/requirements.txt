@@ -1,10 +1,14 @@
 ipykernel
-unstructured[all-docs]
+# unstructured[all-docs]
 arxiv
-azure-ai-formrecognizer==3.3.2
-azure-common==1.1.28
-azure-core==1.29.5
-azure-functions==1.17.0
-azure-identity==1.15.0
-tiktoken==0.5.2
-langchain==0.0.352
+azure-ai-formrecognizer
+azure-common
+azure-core
+azure-functions
+azure-identity
+tiktoken
+langchain
+pypdf
+markdownify
+azure-ai-documentintelligence
+chromadb==0.4.23
