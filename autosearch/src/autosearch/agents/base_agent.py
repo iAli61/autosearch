@@ -1,6 +1,13 @@
 from typing import Dict, Any, Callable
 import autogen
 
+# Termination message definition
+termination_msg = (
+    lambda x: isinstance(x, dict)
+    and "TERMINATE" in str(x.get("content", "")).upper()
+)
+
+
 class BaseAgent(autogen.ConversableAgent):
     """
     Base class for all agents in the AutoSearch project.

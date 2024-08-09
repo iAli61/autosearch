@@ -31,3 +31,5 @@ polymer_representation/polymer_rep
 polymer_representation/papers
 quantum_computing_science/Quantum_Com
 test/example_paper.pdf
+autosearch/notebooks/papers
+*.egg*

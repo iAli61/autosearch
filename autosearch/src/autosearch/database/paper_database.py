@@ -1,6 +1,7 @@
 import sqlite3
 import os
-from typing import List, Tuple, Optional
+from typing import List, Optional
+
 
 class PaperDatabase:
     def __init__(self, project_dir: str):
@@ -18,7 +19,8 @@ class PaperDatabase:
         self._init_db()
 
     def _init_db(self):
-        """Initialize the database with necessary tables."""
+        """Initialize the database with "read_abstracts" table and "read_papers" tables, if they don't already exist."""
+
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute('''
@@ -63,8 +65,8 @@ class PaperDatabase:
 
         if table_name == 'read_abstracts':
             c.execute('''
-                INSERT OR REPLACE INTO read_abstracts 
-                (url, title, authors, published_date, last_updated_date) 
+                INSERT OR REPLACE INTO read_abstracts
+                (url, title, authors, published_date, last_updated_date)
                 VALUES (?, ?, ?, ?, ?)
             ''', (
                 paper_data['url'],
@@ -75,8 +77,8 @@ class PaperDatabase:
             ))
         elif table_name == 'read_papers':
             c.execute('''
-                INSERT OR REPLACE INTO read_papers 
-                (url, title, authors, published_date, last_updated_date, local_path) 
+                INSERT OR REPLACE INTO read_papers
+                (url, title, authors, published_date, last_updated_date, local_path)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 paper_data['url'],
@@ -280,10 +282,11 @@ class PaperDatabase:
         conn.close()
         return []
 
+
 # Example usage
 if __name__ == "__main__":
     db = PaperDatabase("./project_directory")
-    
+
     # Add a paper with only URL
     db.add_paper('read_abstracts', {
         'url': 'https://arxiv.org/abs/1234.5678'

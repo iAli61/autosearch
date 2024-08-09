@@ -8,11 +8,14 @@ from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.exceptions import HttpResponseError
 import os
 import json
-from typing import List, Dict, Any, Union, Tuple
+from typing import List, Dict, Any, Tuple
 from langchain.schema import Document
 import tiktoken
 
 from autosearch.analysis import tablehelper as tb
+
+from autosearch.api.arxiv_api import ArxivAPI
+
 
 class DocumentAnalyzer:
     """
@@ -21,7 +24,7 @@ class DocumentAnalyzer:
     This class provides methods for analyzing PDFs and creating structured documents from the analyzed data.
     """
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str, project_dir: str):
         """
         Initialize the DocumentAnalyzer.
 
@@ -30,6 +33,10 @@ class DocumentAnalyzer:
             endpoint (str): The endpoint URL for Azure Document Intelligence.
         """
         self.client = DocumentAnalysisClient(endpoint, AzureKeyCredential(api_key))
+        self.project_dir = project_dir
+        self.output_dir = f"{project_dir}/output"
+        os.makedirs(f"{self.output_dir}/json", exist_ok=True)
+        os.makedirs(f"{self.output_dir}/markdown", exist_ok=True)
 
     def analyze_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -161,7 +168,7 @@ class DocumentAnalyzer:
         else:
             return table['spans'][0]['offset'] + table['spans'][0]['length'] + 1
 
-    def _add_document(self, docs: List[Document], text: str, pages: List[int], source_name: str, 
+    def _add_document(self, docs: List[Document], text: str, pages: List[int], source_name: str,
                       max_token_size: int, full_md_text: str, largest_doc: int) -> Tuple[List[Document], str, int]:
         """Add a new document to the list, splitting if necessary."""
         tokens = self.count_tokens(text)
@@ -221,7 +228,8 @@ class DocumentAnalyzer:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=4)
 
-    def analyze_and_create_docs(self, pdf_path: str, max_token_size: int = 3000) -> List[Document]:
+    def analyze_and_create_docs(self, pdf_path: str, max_token_size: int = 3000
+                                ) -> Tuple[List[Document], Dict[str, str], str]:
         """
         Analyze a PDF and create structured documents from it.
 
@@ -235,45 +243,40 @@ class DocumentAnalyzer:
             List[Document]: A list of created documents.
         """
         analysis_result = self.analyze_pdf(pdf_path)
-        return self.create_docs(analysis_result, 
-                                max_token_size=max_token_size, 
+        self.save_analysis_result(analysis_result, f"{self.output_dir}/json/{os.path.basename(pdf_path)}.json")
+        return self.create_docs(analysis_result,
+                                max_token_size=max_token_size,
                                 source_name=os.path.basename(pdf_path))
 
-# Example usage
-if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
+    def pdf2md_chunck(self, url: str, max_token_size: int = 3000) -> List[Document]:
+        """
+        Analyze a PDF and create structured documents from it.
 
-    # Load environment variables
-    load_dotenv()
+        This method combines the analyze_pdf and create_docs steps.
 
-    # Retrieve Azure credentials from environment variables
-    api_key = os.getenv("DOCUMENT_INTELLIGENCE_KEY")
-    endpoint = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT")
+        Args:
+            url (str): The url or path to the PDF file.
+            max_token_size (int): The maximum token size for each created document. Defaults to 3000.
 
-    # Initialize the DocumentAnalyzer
-    analyzer = DocumentAnalyzer(api_key, endpoint)
+        Returns:
+            List[Document]: A list of created documents.
+        """
+        if url[-4:] != ".pdf":
+            pdf_filename = url.split('/')[-1] + ".pdf"
+        else:
+            pdf_filename = url.split('/')[-1]
 
-    # Analyze a PDF
-    pdf_path = "path/to/your/document.pdf"
-    try:
-        result = analyzer.analyze_pdf(pdf_path)
-        print("Analysis completed successfully.")
+        if url.startswith("http"):
+            pdf_path = os.path.join(self.output_dir, pdf_filename)
+            # Download the PDF
+            ArxivAPI.download_pdf(url, pdf_path)
+        else:
+            pdf_path = url
 
-        # Save the analysis result
-        analyzer.save_analysis_result(result, "analysis_result.json")
-        print("Analysis result saved to analysis_result.json")
+        docs, pagecontent, fullmdtext = self.analyze_and_create_docs(pdf_path, max_token_size)
 
-        # Create documents from the analysis result
-        docs, page_content, full_md_text = analyzer.create_docs(result)
-        print(f"Created {len(docs)} documents.")
+        # write fullmdtext to a file
+        with open(f"{self.output_dir}/markdown/{pdf_filename}.md", "w") as f:
+            f.write(fullmdtext)
 
-        # Print the content of the first document
-        if docs:
-            print("First document content:")
-            print(docs[0].page_content[:500] + "...")  # Print first 500 characters
-
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-    except HttpResponseError as e:
-        print(f"Azure service error: {e}")
+        return docs

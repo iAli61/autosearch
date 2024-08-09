@@ -1,0 +1,7 @@
+{
+    "flake8.ignorePatterns": [
+        "E501"
+    ],
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true
+}

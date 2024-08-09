@@ -3,11 +3,11 @@ arxiv_api.py: This module provides a class for interacting with the ArXiv API.
 """
 
 import arxiv
-import requests
 import os
 import re
-from typing import List, Dict, Optional, Union
+from typing import List, Dict
 from urllib.parse import urlparse
+
 
 class ArxivAPI:
     """
@@ -37,7 +37,7 @@ class ArxivAPI:
         return list(arxiv.Client().results(search))
 
     @staticmethod
-    def get_paper_metadata(identifier: str) -> Dict[str, Union[str, List[str]]]:
+    def get_paper_metadata(identifier: str) -> Dict[str, str]:
         """
         Retrieve metadata for a paper given its ArXiv identifier or URL.
 
@@ -53,14 +53,14 @@ class ArxivAPI:
 
         return {
             "title": result.title,
-            "authors": [str(author) for author in result.authors],
+            "authors": ','.join([str(author) for author in result.authors]),
             "summary": result.summary,
             "comment": result.comment,
             "journal_ref": result.journal_ref,
             "doi": result.doi,
             "primary_category": result.primary_category,
-            "categories": result.categories,
-            "links": [str(link) for link in result.links],
+            "categories": ','.join(result.categories),
+            "links": ','.join([str(link) for link in result.links]),
             "pdf_url": result.pdf_url,
             "published": result.published.isoformat(),
             "updated": result.updated.isoformat(),
@@ -105,7 +105,7 @@ class ArxivAPI:
         """
         # Regular expression for ArXiv ID format
         arxiv_id_pattern = r'\d{4}\.\d{4,5}(v\d+)?'
-        
+
         # Check if it's already a valid ArXiv ID
         if re.fullmatch(arxiv_id_pattern, identifier):
             return identifier
@@ -139,7 +139,7 @@ class ArxivAPI:
 
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
             ArxivAPI.download_pdf(identifier, temp_file.name)
-            
+
             with open(temp_file.name, 'rb') as pdf_file:
                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                 full_text = ""
@@ -175,7 +175,10 @@ class ArxivAPI:
 
         return results
 
+
 # Example usage
+
+
 if __name__ == "__main__":
     # Search for papers
     results = ArxivAPI.search("quantum computing", n_results=5)
@@ -195,7 +198,7 @@ if __name__ == "__main__":
 
     # Download a PDF
     ArxivAPI.download_pdf(paper_url, "example_paper.pdf")
-    print(f"PDF downloaded to: example_paper.pdf")
+    print("PDF downloaded to: example_paper.pdf")
 
     # Get full text of a paper
     full_text = ArxivAPI.get_paper_full_text(paper_url)
