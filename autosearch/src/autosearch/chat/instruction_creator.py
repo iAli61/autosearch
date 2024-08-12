@@ -49,12 +49,13 @@ class InstructionCreator(ResearchGroupChat):
             max_round=max_round
         )
 
-    def run(self, title: str, silent: bool = False):
+    def run(self, title: str, target_audience: str, silent: bool = False):
         """
         Execute the instruction creation process.
 
         Args:
             title (str): The title of the article for which instructions are being created.
+            target_audience (str): The target audience for the article.
             silent (bool): Whether to run the chat silently or not.
 
         Returns:
@@ -64,8 +65,12 @@ class InstructionCreator(ResearchGroupChat):
         We need to create comprehensive instructions for the Editor-in-Chief to write an article titled:
         "{title}"
 
-        Each agent should contribute their expertise to craft a well-rounded instruction.
-        Topic Expert, please start by analyzing the title and providing key insights.
+        The target audience for this article is: {target_audience}
+
+        Each agent should contribute their expertise to craft a well-rounded instruction,
+        keeping in mind the specific needs and background of the target audience.
+        Topic Expert, please start by analyzing the title and providing key insights,
+        considering how they should be presented to this audience.
         """
 
         chat_hist = self.agents_list[0].initiate_chat(

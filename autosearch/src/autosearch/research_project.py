@@ -1,3 +1,4 @@
+from autosearch import agents
 from autosearch.database.paper_database import PaperDatabase
 from autosearch.analysis.document_analyzer import DocumentAnalyzer
 from autosearch.agents.agents_creator import AgentsCreator
@@ -109,43 +110,49 @@ class ResearchProject:
 
         return agents_groups
 
-    def run(self, title: str):
+    def run(self, title: str, target_audience: str):
         """
         Execute the entire research workflow.
+
+        Args:
+            title (str): The title of the article.
+            target_audience (str): The target audience for the article.
 
         Returns:
             str: The final blog post.
         """
         self.title = title
+        self.target_audience = target_audience
+
         # Create instruction
         self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'])
-        self.instruction = self.instruction_creator.run(title, silent=False)
+        self.instruction = self.instruction_creator.run(title, target_audience, silent=False)
         # Create outline
-        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=40)
+        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=150)
 
         def write_section(
                 title: Annotated[str, "The title of the section."],
-                brief: Annotated[str, "a clear, detailed brief about what section should be included."],
-                silent: Annotated[bool, "it should be always True."] = True
+                brief: Annotated[str, "A clear, detailed brief about what the section should include."],
+                mind_map: Annotated[str, "The Graphviz code for the mind map of the entire blog post."],
+                silent: Annotated[bool, "It should always be True."] = True
         ):
             module = importlib.import_module('autosearch.communities.write_section_agents')
             agentsconfig = getattr(module, "agentsconfig")
             agents = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
             section_writer = SectionWriter(self.ProjectConfig, agents, max_round=20)
-            return section_writer.run(brief=brief, title=title, silent=silent)
+            return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)
 
         # find blog_editor agent in self.agents_groups['outline_agents']
-        blog_editor = None
-        for agent in self.agents_groups['outline_agents']:
-            if agent.name == "blog_editor-in-chief":
-                blog_editor = agent
-                break
+        agents_dict = {k: v for d in self.agents_groups['outline_agents'] for k, v in d.items()}
+        blog_editor = agents_dict.get("blog_editor-in-chief", None)
+        if blog_editor is None:
+            raise ValueError("No blog_editor-in-chief agent found in outline_agents")
         autogen.agentchat.register_function(
             f=write_section,
             name="write_section",
-            caller=blog_editor,  # type: ignore
-            executor=self.agents_groups['outline_agents'][-1],
-            description="Write a section based on the given title and brief.",
+            caller=blog_editor,
+            executor=agents_dict['editor_user'],
+            description="Write a section based on the given title, brief, and mind map.",
         )
 
         mind_map, titles, briefs, overall_word_count = self.outline_creator.run(
