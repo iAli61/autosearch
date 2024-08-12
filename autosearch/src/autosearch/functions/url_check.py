@@ -1,5 +1,21 @@
 from typing_extensions import Annotated
 from autosearch.api.arxiv_api import ArxivAPI
+from autosearch.functions.base_function import BaseFunction
+from autosearch.project_config import ProjectConfig
+
+
+class UrlCheck(BaseFunction):
+    """
+    A class representing the get_pdf function.
+    """
+
+    def __init__(self, project_config: ProjectConfig):
+        super().__init__(
+            name="url_check",
+            description="Check if the provided URL is from arxiv.org and is for the provided paper's title.",
+            func=url_check,
+            project_config=project_config
+        )
 
 
 def url_check(paper_url: Annotated[str, "The URL of the paper to check."],

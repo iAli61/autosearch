@@ -1,36 +1,26 @@
-# from autosearch.api.arxiv_api import search
 from autosearch.functions.check_reasoning import check_reasoning
 from autosearch.api.arxiv_api import ArxivAPI
 from autosearch.functions.text_analysis import chunk_pdf
+from autosearch.functions.base_function import BaseFunction
+from autosearch.project_config import ProjectConfig
 
 from typing_extensions import Annotated
-from typing import List, Dict, Any
+from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-# Global configuration object
-global_config: Dict[str, Any] = {}
+class GetPDFs(BaseFunction):
+    """
+    A class representing the get_pdf function.
+    """
 
-
-def initialize_get_pdfs(
-    paper_db,
-    doc_analyzer,
-    project_dir: str,
-    db_dir: str,
-    config_list: List[dict],
-    initiate_db: bool = False
-):
-    """Initialize the global configuration object."""
-    global global_config
-    global_config = {
-        "paper_db": paper_db,
-        "doc_analyzer": doc_analyzer,
-        "project_dir": project_dir,
-        "db_dir": db_dir,
-        "config_list": config_list,
-        "initiate_db": initiate_db,
-        "config_list": config_list
-    }
+    def __init__(self, project_config: ProjectConfig):
+        super().__init__(
+            name="get_pdfs",
+            description="Retrieve the content of the pdf files from the urls list.",
+            func=get_pdfs,
+            project_config=project_config
+        )
 
 
 """
@@ -41,16 +31,13 @@ each chunk of the article with a teachable agent and a user.
 
 
 def get_pdfs(urls: Annotated[List[str], "The list of URLs of the papers to read."],
-             reasons: Annotated[List[str], "The list of reasons for reading the papers. it should be same size as urls list."]
+             reasons: Annotated[List[str], "The list of reasons for reading the papers. it should be same size as urls list."],
+             project_config: ProjectConfig,
              ) -> str:
 
-    global global_config
-    if not global_config:
-        raise ValueError("Global configuration not initialized. Call initialize_global_config first.")
-
-    paper_db = global_config["paper_db"]
-    initiate_db = global_config["initiate_db"]
-    config_list = global_config["config_list"]
+    paper_db = project_config.paper_db
+    initiate_db = project_config.initiate_db
+    config_list = project_config.config_list
 
     urls_list = []
     metadata_list = []
@@ -76,7 +63,7 @@ def get_pdfs(urls: Annotated[List[str], "The list of URLs of the papers to read.
             metadata_list.append(metadata)
 
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(chunk_pdf, url, metadata, global_config) for url, title in zip(urls_list, metadata_list)]
+        futures = [executor.submit(chunk_pdf, url, metadata, project_config) for url, title in zip(urls_list, metadata_list)]
         for future in as_completed(futures):
             future.result()
 

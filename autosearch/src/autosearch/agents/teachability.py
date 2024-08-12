@@ -46,7 +46,7 @@ class Teachability(AgentCapability):
             llm_config (dict or False): llm inference configuration passed to TextAnalyzerAgent.
             If None, TextAnalyzerAgent uses llm_config from the teachable agent.
         """
-        self.verbosity = verbosity
+        self.verbosity = verbosity if verbosity is not None else 0
         self.path_to_db_dir = path_to_db_dir
         self.recall_threshold = recall_threshold
         self.max_num_retrievals = max_num_retrievals
@@ -75,10 +75,7 @@ class Teachability(AgentCapability):
         self.analyzer = TextAnalyzerAgent(llm_config=self.llm_config)
 
         # Append extra info to the system message.
-        agent.update_system_message(
-            agent.system_message
-            + "\nYou've been given the special ability to remember user teachings from prior conversations."
-        )
+        agent.update_system_message(agent.system_message + "\nYou've been given the special ability to remember user teachings from prior conversations.")
 
     def prepopulate_db(self):
         """Adds a few arbitrary memos to the DB."""
@@ -194,7 +191,7 @@ class Teachability(AgentCapability):
 
         # Append the memos to the text of the last message.
         if self.verbosity >= 1:
-                print(colored(f"\nnew Message: {comment + self._concatenate_memo_texts(memo_list)}", "magenta"))
+            print(colored(f"\nnew Message: {comment + self._concatenate_memo_texts(memo_list)}", "magenta"))
         return comment + self._concatenate_memo_texts(memo_list)
 
     def _retrieve_relevant_memos(self, input_text):
@@ -226,7 +223,7 @@ class Teachability(AgentCapability):
 
     def _analyze(self, text_to_analyze, analysis_instructions):
         """Asks TextAnalyzerAgent to analyze the given text according to specific instructions."""
-        self.analyzer.reset()  # Clear the analyzer's list of messages.
+        self.analyzer.reset()  # type: ignore # Clear the analyzer's list of messages.
         self.teachable_agent.send(
             recipient=self.analyzer, message=text_to_analyze, request_reply=False, silent=(self.verbosity < 2)
         )  # Put the message in the analyzer's list.
@@ -340,7 +337,7 @@ class MemoStore:
         uid, input_text, distance, output_text = results["ids"][0][0], results["documents"][0][0], results["distances"][0][0], results["metadatas"][0][0]["answer"]
         try:
             input_text_2, _ = self.uid_text_dict[uid]
-            if  input_text != input_text_2:
+            if input_text != input_text_2:
                 self.sync_momes()
         except KeyError:
             self.sync_momes()
@@ -364,11 +361,11 @@ class MemoStore:
             if distance < threshold:
                 try:
                     input_text_2, _ = self.uid_text_dict[uid]
-                    if  input_text != input_text_2:
+                    if input_text != input_text_2:
                         self.sync_momes()
                 except KeyError:
                     self.sync_momes()
-                
+
                 if self.verbosity >= 1:
                     print(
                         colored(

@@ -1,6 +1,6 @@
 import autogen
 from autosearch.agents.teachability import Teachability
-from autosearch.agents.base_agent import termination_msg
+from autosearch.agents.utils import termination_msg
 
 
 def create_teachable_groupchat(assitant_name, user_name, db_dir, config_list,

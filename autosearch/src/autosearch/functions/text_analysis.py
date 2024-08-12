@@ -4,9 +4,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
 
-def momorized_text(text, metadata, _config):
-    db_dir = _config["db_dir"]
-    config_list = _config["config_list"]
+def momorized_text(text, metadata, project_config):
+    
+    db_dir = project_config.db_dir
+    config_list = project_config.config_list
 
     title = f"{metadata['title']} [{metadata['pdf_url']}] updated on {metadata['updated']}"
 
@@ -20,11 +21,11 @@ def momorized_text(text, metadata, _config):
         print(colored(f"text: {text}", "red"))
 
 
-def chunk_pdf(url, metadata, _config):
+def chunk_pdf(url, metadata, project_config):
 
-    paper_db = _config["paper_db"]
-    doc_analyzer = _config["doc_analyzer"]
-    project_dir = _config["project_dir"]
+    paper_db = project_config.paper_db
+    doc_analyzer = project_config.doc_analyzer
+    project_dir = project_config.project_dir
 
     chunked_elements = doc_analyzer.pdf2md_chunck(url)
 
@@ -39,7 +40,7 @@ def chunk_pdf(url, metadata, _config):
             break
 
     with ThreadPoolExecutor() as executor:  # type: ignore
-        futures = [executor.submit(momorized_text, chunk.page_content, metadata, _config) for chunk in chunked_elements if len(chunk.page_content.split()) > 30]
+        futures = [executor.submit(momorized_text, chunk.page_content, metadata, project_config) for chunk in chunked_elements if len(chunk.page_content.split()) > 30]
         for future in as_completed(futures):
             future.result()
 

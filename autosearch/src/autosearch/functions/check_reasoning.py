@@ -1,5 +1,5 @@
 import autogen
-from autosearch.agents.base_agent import termination_msg
+from autosearch.agents.utils import termination_msg
 
 
 def check_reasoning(reason, summary, config_list):
