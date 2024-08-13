@@ -7,6 +7,7 @@ from autosearch.chat.write_section import SectionWriter
 from autosearch.api.arxiv_api import ArxivAPI
 from autosearch.project_config import ProjectConfig
 from autosearch.functions.memorization_skill import memorization_skill
+from autosearch.functions.process_local_pdfs import ProcessLocalPDFs
 
 from autosearch.functions.base_function import BaseFunction
 
@@ -28,6 +29,7 @@ class ResearchProject:
                  communiteList: List[str], config: Dict[str, Any],
                  config_file: str, initiate_db: bool = False,
                  funcClsList: Optional[List[str]] = None,
+                 local_papers_dir: str = "./papers"
                  ):
         """
         Initialize the ResearchProject.
@@ -75,6 +77,8 @@ class ResearchProject:
         self.functions = self._initialize_functions()
         self.communiteList = communiteList
         self.agents_groups = self._initialize_agents()
+        # Process local PDFs
+        self._process_local_pdfs(local_papers_dir)
 
     def _initialize_functions(self) -> List[BaseFunction]:
         """
@@ -108,6 +112,11 @@ class ResearchProject:
             agents_groups[agent_name] = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
 
         return agents_groups
+
+    def _process_local_pdfs(self, local_papers_dir: str):
+        process_local_pdfs_function = ProcessLocalPDFs(self.ProjectConfig)
+        result = process_local_pdfs_function.func(self.ProjectConfig, local_papers_dir)
+        print(result)
 
     def run(self, title: str, target_audience: str):
         """

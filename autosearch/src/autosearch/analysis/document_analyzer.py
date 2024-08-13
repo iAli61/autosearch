@@ -1,8 +1,3 @@
-
-"""
-document_analyzer.py: This module provides a class for analyzing PDF documents using Azure's Document Intelligence service.
-"""
-
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.exceptions import HttpResponseError
@@ -13,8 +8,8 @@ from langchain.schema import Document
 import tiktoken
 
 from autosearch.analysis import tablehelper as tb
-
 from autosearch.api.search_manager import SearchManager
+from autosearch.functions.text_analysis import chunk_pdf
 
 
 class DocumentAnalyzer:
@@ -275,7 +270,7 @@ class DocumentAnalyzer:
                 api_name = 'google_scholar'
             else:
                 raise ValueError(f"Unsupported URL: {url}")
-            
+
             # Download the PDF
             try:
                 pdf_path = self.search_manager.download_pdf(pdf_filename, api_name, self.output_dir)
@@ -285,10 +280,76 @@ class DocumentAnalyzer:
         else:
             pdf_path = url
 
-        docs, pagecontent, fullmdtext = self.analyze_and_create_docs(pdf_path, max_token_size)
+        docs, _, fullmdtext = self.analyze_and_create_docs(pdf_path, max_token_size)
 
         # write fullmdtext to a file
         with open(f"{self.output_dir}/markdown/{pdf_filename}.md", "w") as f:
             f.write(fullmdtext)
 
         return docs
+
+    def extract_text_and_title_from_pdf(self, pdf_path: str) -> Tuple[str, str]:
+
+        docs = self.pdf2md_chunck(pdf_path)
+        md_file = f"{self.output_dir}/markdown/{os.path.basename(pdf_path)}.md"
+        with open(md_file, "r") as f:
+            full_md_text = f.read()
+
+        # Extract title from the first document chunk
+        title = docs[0].page_content.split('\n', 1)[0] if docs else os.path.basename(pdf_path)
+
+        return full_md_text, title
+
+    def process_local_pdf(self, pdf_path: str, project_config) -> Dict[str, Any]:
+
+        try:
+            # Extract text and title from PDF using pdf2md_chunck
+            pdf_text, pdf_title = self.extract_text_and_title_from_pdf(pdf_path)
+
+            # Try to get metadata by searching for the PDF title
+            metadata = self.search_for_metadata(pdf_title)
+
+            if not metadata:
+                metadata = {
+                    'title': pdf_title,
+                    'authors': 'Unknown',
+                    'published': 'Unknown',
+                    'updated': 'Unknown',
+                    'summary': pdf_text[:500] + "..."  # Use first 500 characters as summary
+                }
+
+            # Add paper to database
+            paper_data = {
+                'url': f"local:{pdf_path}",
+                'local_path': pdf_path,
+                'title': metadata['title'],
+                'authors': metadata['authors'],
+                'published_date': metadata.get('published', 'Unknown'),
+                'last_updated_date': metadata.get('updated', 'Unknown'),
+                'source': 'local'
+            }
+
+            # Chunk the PDF and add to memory using the existing chunk_pdf function
+            chunk_pdf(pdf_path, paper_data, project_config)
+
+            return {
+                'metadata': metadata,
+                'full_text': pdf_text
+            }
+
+        except Exception as e:
+            raise Exception(f"Error processing {pdf_path}: {str(e)}")
+
+    def search_for_metadata(self, title: str) -> Dict[str, Any]:
+        try:
+            # Search across all APIs
+            results = self.search_manager.search_all(title, n_results=1)
+
+            # Check if we got any results
+            for api_results in results.values():
+                if api_results:
+                    return api_results[0]
+
+            return {}
+        except Exception:
+            return {}

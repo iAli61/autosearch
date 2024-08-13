@@ -45,7 +45,7 @@ def chunk_pdf(url, metadata, project_config, source="arxiv"):
             future.result()
 
     paper_data = {'url': url,
-                  'local_path': project_dir,
+                  'local_path': metadata.get('local_path', project_dir),
                   'title': metadata['title'],
                   'authors': metadata['authors'],
                   'published_date': metadata['published'],
