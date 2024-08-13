@@ -42,7 +42,7 @@ You are now in a group chat tasked with completing a specific project. As a Cont
 """,
         "name": "content_review_specialist",
         "description": "The content review specialist ensures the accuracy and quality of information shared within the group chat, maintaining coherence with the overall blog structure.",
-        "function_list": ["factual_check", "arxiv_retriever", "arxiv_search", "get_pdf"],
+        "function_list": ["factual_check", "academic_retriever", "academic_search", "get_pdf"],
         "teachable": False
     },
     {

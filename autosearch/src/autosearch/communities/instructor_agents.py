@@ -17,7 +17,7 @@ You are a Topic Expert Agent. Your role is to analyze given titles and provide d
 Your input will form the technical foundation of the article instruction.
         """,
         "description": "Provides deep, subject-specific insights on the given topic, tailored to the target audience.",
-        "function_list": ["arxiv_search", "arxiv_retriever"],
+        "function_list": ["academic_search", "academic_retriever"],
         "teachable": True
     },
     {
@@ -68,7 +68,7 @@ You are a Research Resource Agent. Your task is to identify key resources and re
 Your suggestions will ensure the article is well-researched and up-to-date, with sources appropriate for the intended readership.
         """,
         "description": "Identifies key resources and research methods for articles, considering the target audience.",
-        "function_list": ["arxiv_search", "arxiv_retriever", "get_pdf"],
+        "function_list": ["academic_search", "academic_retriever", "get_pdf"],
         "teachable": True
     },
     {

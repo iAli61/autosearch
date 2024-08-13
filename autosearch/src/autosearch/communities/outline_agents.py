@@ -1,7 +1,7 @@
 from autosearch.agents.base_agent import AgentConfig
 
 # 1. Analyze the Topic: Evaluate the topic comprehensively to pinpoint essential points that the blog post should cover.
-# ['factual_check', 'get_pdf', 'get_pdfs', 'url_check','arxiv_retriever','arxiv_search']
+# ['factual_check', 'get_pdf', 'get_pdfs', 'url_check','academic_retriever','academic_search']
 editoral_agents_config = [
     {
         "name": "blog_editor-in-chief",
@@ -62,7 +62,7 @@ Formatting Guidelines:
 Remember to actively seek input from your team throughout the process, maintaining open lines of communication. Your goal is to produce a high-quality, data-rich blog post that effectively communicates its subject matter to the target audience.
 """,
         "description": "The blog Editor-in-Chief is central to orchestrating a collaborative blog project, leading the writer team to produce a cohesive, data-driven post. They analyze topics, structure content, coordinate contributions, and manage communications, ensuring the project adheres to editorial standards and is ready for successful publication.",
-        "function_list": ["arxiv_retriever", "arxiv_search", "get_pdf", "get_pdfs"],
+        "function_list": ["academic_retriever", "academic_search", "get_pdf", "get_pdfs"],
         "teachable": True
     },
     {

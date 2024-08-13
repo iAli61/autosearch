@@ -12,15 +12,11 @@ class PaperDatabase:
             project_dir (str): The directory path where the database file will be created.
         """
         self.project_dir = project_dir
-        # create dir if not exists
         os.makedirs(project_dir, exist_ok=True)
-
         self.db_path = os.path.join(project_dir, 'papers.db')
         self._init_db()
 
     def _init_db(self):
-        """Initialize the database with "read_abstracts" table and "read_papers" tables, if they don't already exist."""
-
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute('''
@@ -29,7 +25,8 @@ class PaperDatabase:
                 title TEXT,
                 authors TEXT,
                 published_date TEXT,
-                last_updated_date TEXT
+                last_updated_date TEXT,
+                source TEXT
             )
         ''')
         c.execute('''
@@ -39,7 +36,8 @@ class PaperDatabase:
                 authors TEXT,
                 published_date TEXT,
                 last_updated_date TEXT,
-                local_path TEXT
+                local_path TEXT,
+                source TEXT
             )
         ''')
         conn.commit()
@@ -59,6 +57,8 @@ class PaperDatabase:
         """
         if 'url' not in paper_data:
             raise ValueError("The 'url' field is mandatory for adding a paper.")
+        if 'source' not in paper_data:
+            raise ValueError("The 'source' field is mandatory for adding a paper.")
 
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -66,19 +66,7 @@ class PaperDatabase:
         if table_name == 'read_abstracts':
             c.execute('''
                 INSERT OR REPLACE INTO read_abstracts
-                (url, title, authors, published_date, last_updated_date)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (
-                paper_data['url'],
-                paper_data.get('title', ''),
-                paper_data.get('authors', ''),
-                paper_data.get('published_date', ''),
-                paper_data.get('last_updated_date', '')
-            ))
-        elif table_name == 'read_papers':
-            c.execute('''
-                INSERT OR REPLACE INTO read_papers
-                (url, title, authors, published_date, last_updated_date, local_path)
+                (url, title, authors, published_date, last_updated_date, source)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 paper_data['url'],
@@ -86,7 +74,21 @@ class PaperDatabase:
                 paper_data.get('authors', ''),
                 paper_data.get('published_date', ''),
                 paper_data.get('last_updated_date', ''),
-                paper_data.get('local_path', '')
+                paper_data['source']
+            ))
+        elif table_name == 'read_papers':
+            c.execute('''
+                INSERT OR REPLACE INTO read_papers
+                (url, title, authors, published_date, last_updated_date, local_path, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                paper_data['url'],
+                paper_data.get('title', ''),
+                paper_data.get('authors', ''),
+                paper_data.get('published_date', ''),
+                paper_data.get('last_updated_date', ''),
+                paper_data.get('local_path', ''),
+                paper_data['source']
             ))
         else:
             conn.close()
@@ -135,7 +137,8 @@ class PaperDatabase:
                     'title': result[1],
                     'authors': result[2],
                     'published_date': result[3],
-                    'last_updated_date': result[4]
+                    'last_updated_date': result[4],
+                    'source': result[5]
                 }
         elif table_name == 'read_papers':
             c.execute("SELECT * FROM read_papers WHERE url = ?", (url,))
@@ -147,7 +150,8 @@ class PaperDatabase:
                     'authors': result[2],
                     'published_date': result[3],
                     'last_updated_date': result[4],
-                    'local_path': result[5]
+                    'local_path': result[5],
+                    'source': result[6]
                 }
         conn.close()
         return None
@@ -189,7 +193,8 @@ class PaperDatabase:
                     'title': row[1],
                     'authors': row[2],
                     'published_date': row[3],
-                    'last_updated_date': row[4]
+                    'last_updated_date': row[4],
+                    'source': row[5]
                 }
                 for row in c.fetchall()
             ]
@@ -202,7 +207,8 @@ class PaperDatabase:
                     'authors': row[2],
                     'published_date': row[3],
                     'last_updated_date': row[4],
-                    'local_path': row[5]
+                    'local_path': row[5],
+                    'source': row[6]
                 }
                 for row in c.fetchall()
             ]
@@ -262,7 +268,8 @@ class PaperDatabase:
                     'title': row[1],
                     'authors': row[2],
                     'published_date': row[3],
-                    'last_updated_date': row[4]
+                    'last_updated_date': row[4],
+                    'source': row[5]
                 }
                 for row in c.fetchall()
             ]
@@ -275,54 +282,12 @@ class PaperDatabase:
                     'authors': row[2],
                     'published_date': row[3],
                     'last_updated_date': row[4],
-                    'local_path': row[5]
+                    'local_path': row[5],
+                    'source': row[6]
                 }
                 for row in c.fetchall()
             ]
         conn.close()
         return []
 
-
-# Example usage
-if __name__ == "__main__":
-    db = PaperDatabase("./project_directory")
-
-    # Add a paper with only URL
-    db.add_paper('read_abstracts', {
-        'url': 'https://arxiv.org/abs/1234.5678'
-    })
-
-    # Add a paper with partial information
-    db.add_paper('read_abstracts', {
-        'url': 'https://arxiv.org/abs/2345.6789',
-        'title': 'Partial Information Paper',
-        'authors': 'John Doe'
-    })
-
-    # Add a paper with full information
-    db.add_paper('read_papers', {
-        'url': 'https://arxiv.org/abs/3456.7890',
-        'title': 'Full Information Paper',
-        'authors': 'Jane Smith, Bob Johnson',
-        'published_date': '2023-05-15',
-        'last_updated_date': '2023-05-20',
-        'local_path': '/path/to/local/file.pdf'
-    })
-
-    # Try to add a paper without URL (this will raise an error)
-    try:
-        db.add_paper('read_abstracts', {
-            'title': 'Paper Without URL'
-        })
-    except ValueError as e:
-        print(f"Error: {e}")
-
-    # Check if papers exist
-    print(db.check_paper('https://arxiv.org/abs/1234.5678', 'read_abstracts'))
-    print(db.check_paper('https://arxiv.org/abs/2345.6789', 'read_abstracts'))
-    print(db.check_paper('https://arxiv.org/abs/3456.7890', 'read_papers'))
-
-    # Get paper info
-    print(db.get_paper_info('https://arxiv.org/abs/1234.5678', 'read_abstracts'))
-    print(db.get_paper_info('https://arxiv.org/abs/2345.6789', 'read_abstracts'))
-    print(db.get_paper_info('https://arxiv.org/abs/3456.7890', 'read_papers'))
+    # Other methods (check_paper, count_papers, update_paper, delete_paper) remain unchanged

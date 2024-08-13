@@ -1,4 +1,3 @@
-from autosearch import agents
 from autosearch.database.paper_database import PaperDatabase
 from autosearch.analysis.document_analyzer import DocumentAnalyzer
 from autosearch.agents.agents_creator import AgentsCreator

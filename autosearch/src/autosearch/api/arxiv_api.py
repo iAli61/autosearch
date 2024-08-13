@@ -1,69 +1,43 @@
-"""
-arxiv_api.py: This module provides a class for interacting with the ArXiv API.
-"""
-
 import arxiv
+from typing import List, Dict, Any
+from .search_api_base import SearchAPIBase
 import os
 import re
-from typing import List, Dict
 from urllib.parse import urlparse
 
 
-class ArxivAPI:
-    """
-    A class for interacting with the ArXiv API.
+class ArxivAPI(SearchAPIBase):
 
-    This class provides methods for searching papers, retrieving metadata,
-    and downloading PDFs from ArXiv.
-    """
-
-    @staticmethod
-    def search(query: str, n_results: int = 10) -> List[arxiv.Result]:
-        """
-        Search for papers on ArXiv.
-
-        Args:
-            query (str): The search query.
-            n_results (int): The number of results to return. Defaults to 10.
-
-        Returns:
-            List[arxiv.Result]: A list of search results.
-        """
+    def search(self, query: str, n_results: int = 10) -> List[Dict[str, Any]]:
         search = arxiv.Search(
             query=query,
             max_results=n_results,
             sort_by=arxiv.SortCriterion.Relevance
         )
-        return list(arxiv.Client().results(search))
 
-    @staticmethod
-    def get_paper_metadata(identifier: str) -> Dict[str, str]:
-        """
-        Retrieve metadata for a paper given its ArXiv identifier or URL.
+        results = []
+        for result in search.results():
+            results.append({
+                'title': result.title,
+                'authors': ', '.join(author.name for author in result.authors),
+                'summary': result.summary,
+                'pdf_url': result.pdf_url,
+                'published': result.published.strftime('%Y-%m-%d'),
+                'updated': result.updated.strftime('%Y-%m-%d')
+            })
+        return results
 
-        Args:
-            identifier (str): The ArXiv identifier or URL of the paper.
-
-        Returns:
-            Dict[str, Union[str, List[str]]]: Metadata of the paper.
-        """
-        paper_id = ArxivAPI._extract_arxiv_id(identifier)
-        search = arxiv.Search(id_list=[paper_id])
-        result = next(arxiv.Client().results(search))
+    def get_paper_metadata(self, identifier: str) -> Dict[str, Any]:
+        arxiv_id = self._extract_arxiv_id(identifier)
+        paper = next(arxiv.Search(id_list=[arxiv_id]).results())
 
         return {
-            "title": result.title,
-            "authors": ','.join([str(author) for author in result.authors]),
-            "summary": result.summary,
-            "comment": result.comment,
-            "journal_ref": result.journal_ref,
-            "doi": result.doi,
-            "primary_category": result.primary_category,
-            "categories": ','.join(result.categories),
-            "links": ','.join([str(link) for link in result.links]),
-            "pdf_url": result.pdf_url,
-            "published": result.published.isoformat(),
-            "updated": result.updated.isoformat(),
+            'title': paper.title,
+            'authors': ', '.join(author.name for author in paper.authors),
+            'summary': paper.summary,
+            'pdf_url': paper.pdf_url,
+            'published': paper.published.strftime('%Y-%m-%d'),
+            'updated': paper.updated.strftime('%Y-%m-%d')
         }
 
     @staticmethod
@@ -174,38 +148,3 @@ class ArxivAPI:
                 results[identifier] = f"Error: {str(e)}"
 
         return results
-
-
-# Example usage
-
-
-if __name__ == "__main__":
-    # Search for papers
-    results = ArxivAPI.search("quantum computing", n_results=5)
-    for paper in results:
-        print(f"Title: {paper.title}")
-        print(f"Authors: {', '.join(str(author) for author in paper.authors)}")
-        print(f"Summary: {paper.summary[:200]}...")
-        print(f"PDF URL: {paper.pdf_url}")
-        print("---")
-
-    # Get metadata for a specific paper
-    paper_url = "https://arxiv.org/abs/2103.11955"
-    metadata = ArxivAPI.get_paper_metadata(paper_url)
-    print("Paper Metadata:")
-    for key, value in metadata.items():
-        print(f"{key}: {value}")
-
-    # Download a PDF
-    ArxivAPI.download_pdf(paper_url, "example_paper.pdf")
-    print("PDF downloaded to: example_paper.pdf")
-
-    # Get full text of a paper
-    full_text = ArxivAPI.get_paper_full_text(paper_url)
-    print(f"Full text (first 500 characters): {full_text[:500]}...")
-
-    # Batch download PDFs
-    identifiers = ["2103.11955", "https://arxiv.org/abs/2103.11956", "2103.11957"]
-    results = ArxivAPI.batch_download(identifiers, "downloaded_papers")
-    for identifier, result in results.items():
-        print(f"Paper {identifier}: {result}")

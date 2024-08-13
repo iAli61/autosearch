@@ -1,32 +1,40 @@
 from typing_extensions import Annotated
-from autosearch.api.arxiv_api import ArxivAPI
+from autosearch.api.search_manager import SearchManager
 from autosearch.functions.base_function import BaseFunction
 from autosearch.project_config import ProjectConfig
 
 
 class UrlCheck(BaseFunction):
-    """
-    A class representing the get_pdf function.
-    """
-
     def __init__(self, project_config: ProjectConfig):
         super().__init__(
             name="url_check",
-            description="Check if the provided URL is from arxiv.org and is for the provided paper's title.",
+            description="Check if the provided URL is from a supported academic source and is for the provided paper's title.",
             func=url_check,
             project_config=project_config
         )
 
 
-def url_check(paper_url: Annotated[str, "The URL of the paper to check."],
-              paper_title: Annotated[str, "The title of the paper to be used for fact checking."],
-              ):
-    if paper_url.find('arxiv.org') == -1:
-        return False, f"The provided paper URL, {paper_url}, is not from arxiv.org. Please provide a valid arxiv URL."
+def url_check(
+    paper_url: Annotated[str, "The URL of the paper to check."],
+    paper_title: Annotated[str, "The title of the paper to be used for fact checking."],
+    project_config: ProjectConfig
+):
+    search_manager = SearchManager()
 
-    metadata = ArxivAPI.get_paper_metadata(paper_url)
+    # Determine which API to use based on the URL structure
+    if 'arxiv.org' in paper_url:
+        api_name = 'arxiv'
+    elif 'scholar.google.com' in paper_url:
+        api_name = 'google_scholar'
+    else:
+        return False, f"The provided paper URL, {paper_url}, is not from a supported academic source. Please provide a valid URL from arXiv or Google Scholar."
 
-    if metadata['title'] != paper_title:
-        return False, f"The provided paper URL, {paper_url}, is not for the paper titled '{paper_title}'. Please provide a valid arxiv URL for the paper."
+    try:
+        metadata = search_manager.get_paper_metadata(paper_url, api_name)
+    except Exception as e:
+        return False, f"Error retrieving paper metadata: {str(e)}"
 
-    return True, f"The provided paper URL is from arxiv.org and is for the paper titled '{paper_title}'."
+    if metadata['title'].lower() != paper_title.lower():
+        return False, f"The provided paper URL, {paper_url}, is not for the paper titled '{paper_title}'. Please provide a valid URL for the paper."
+
+    return True, f"The provided paper URL is from {api_name} and is for the paper titled '{paper_title}'."

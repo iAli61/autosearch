@@ -1,19 +1,16 @@
 from autosearch.functions.check_reasoning import check_reasoning
-from autosearch.api.arxiv_api import ArxivAPI
 from autosearch.functions.text_analysis import chunk_pdf
 from autosearch.functions.base_function import BaseFunction
 from autosearch.project_config import ProjectConfig
+from autosearch.api.search_manager import SearchManager
 
 from typing_extensions import Annotated
 from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 
 
 class GetPDFs(BaseFunction):
-    """
-    A class representing the get_pdf function.
-    """
-
     def __init__(self, project_config: ProjectConfig):
         super().__init__(
             name="get_pdfs",
@@ -23,28 +20,35 @@ class GetPDFs(BaseFunction):
         )
 
 
-"""
-This `get_pdfs` function downloads a list of PDFs from a given URL, extract theirs content, and
-partition the content into chunks based on titles, and then initiate a chat to share and memorize
-each chunk of the article with a teachable agent and a user.
-"""
-
-
-def get_pdfs(urls: Annotated[List[str], "The list of URLs of the papers to read."],
-             reasons: Annotated[List[str], "The list of reasons for reading the papers. it should be same size as urls list."],
-             project_config: ProjectConfig,
-             ) -> str:
-
+def get_pdfs(
+    urls: Annotated[List[str], "The list of URLs of the papers to read."],
+    reasons: Annotated[List[str], "The list of reasons for reading the papers. it should be same size as urls list."],
+    project_config: ProjectConfig,
+) -> str:
     paper_db = project_config.paper_db
     initiate_db = project_config.initiate_db
     config_list = project_config.config_list
+    search_manager = SearchManager()
 
     urls_list = []
     metadata_list = []
     message = ''
-    for url, reason in zip(urls, reasons):
 
-        metadata = ArxivAPI.get_paper_metadata(url)
+    for url, reason in zip(urls, reasons):
+        # Determine which API to use based on the URL structure
+        if 'arxiv.org' in url:
+            api_name = 'arxiv'
+        elif 'scholar.google.com' in url:
+            api_name = 'google_scholar'
+        else:
+            message += f"Unsupported URL: {url}\n"
+            continue
+
+        try:
+            metadata = search_manager.get_paper_metadata(url, api_name)
+        except Exception as e:
+            message += f"Error retrieving metadata for {url}: {str(e)}\n"
+            continue
 
         title = f"{metadata['title']} [{metadata['pdf_url']}] updated on {metadata['updated']}"
 
@@ -62,13 +66,23 @@ def get_pdfs(urls: Annotated[List[str], "The list of URLs of the papers to read.
             urls_list.append(metadata["pdf_url"])
             metadata_list.append(metadata)
 
+    def process_pdf(url, metadata):
+        try:
+            pdf_filename = os.path.basename(url)
+            pdf_path = os.path.join(project_config.project_dir, 'output', pdf_filename)
+            search_manager.download_pdf(url, api_name, pdf_path)
+            chunk_pdf(pdf_path, metadata, project_config)
+            return f"Successfully processed {metadata['title']}"
+        except Exception as e:
+            return f"Error processing {metadata['title']}: {str(e)}"
+
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(chunk_pdf, url, metadata, project_config) for url, title in zip(urls_list, metadata_list)]
+        futures = [executor.submit(process_pdf, url, metadata) for url, metadata in zip(urls_list, metadata_list)]
         for future in as_completed(futures):
-            future.result()
+            message += future.result() + "\n"
 
     num_papers = paper_db.count_papers("read_papers")
     print(f"{num_papers} articles have been read, so far.")
     titles = [f"{data['title']} [{data['pdf_url']}] updated on {data['updated']}" for data in metadata_list]
-    message += f"The articles \n {', and \n'.join(titles)} \n  have been read and the content has been shared with you in your memory."
+    message += f"The articles \n {', and \n'.join(titles)} \n have been read and the content has been shared with you in your memory."
     return message

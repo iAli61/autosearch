@@ -5,7 +5,7 @@ import re
 
 
 def momorized_text(text, metadata, project_config):
-    
+
     db_dir = project_config.db_dir
     config_list = project_config.config_list
 
@@ -21,7 +21,7 @@ def momorized_text(text, metadata, project_config):
         print(colored(f"text: {text}", "red"))
 
 
-def chunk_pdf(url, metadata, project_config):
+def chunk_pdf(url, metadata, project_config, source="arxiv"):
 
     paper_db = project_config.paper_db
     doc_analyzer = project_config.doc_analyzer
@@ -50,5 +50,6 @@ def chunk_pdf(url, metadata, project_config):
                   'authors': metadata['authors'],
                   'published_date': metadata['published'],
                   'last_updated_date': metadata['updated'],
+                  'source': source
                   }
     paper_db.add_paper("read_papers", paper_data)  # Add paper to the database

@@ -14,7 +14,7 @@ import tiktoken
 
 from autosearch.analysis import tablehelper as tb
 
-from autosearch.api.arxiv_api import ArxivAPI
+from autosearch.api.search_manager import SearchManager
 
 
 class DocumentAnalyzer:
@@ -37,6 +37,7 @@ class DocumentAnalyzer:
         self.output_dir = f"{project_dir}/output"
         os.makedirs(f"{self.output_dir}/json", exist_ok=True)
         os.makedirs(f"{self.output_dir}/markdown", exist_ok=True)
+        self.search_manager = SearchManager()
 
     def analyze_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -267,9 +268,20 @@ class DocumentAnalyzer:
             pdf_filename = url.split('/')[-1]
 
         if url.startswith("http"):
-            pdf_path = os.path.join(self.output_dir, pdf_filename)
+            # Determine which API to use based on the URL structure
+            if 'arxiv.org' in url:
+                api_name = 'arxiv'
+            elif 'scholar.google.com' in url:
+                api_name = 'google_scholar'
+            else:
+                raise ValueError(f"Unsupported URL: {url}")
+            
             # Download the PDF
-            ArxivAPI.download_pdf(url, pdf_path)
+            try:
+                pdf_path = self.search_manager.download_pdf(pdf_filename, api_name, self.output_dir)
+            except Exception as e:
+                print(f"Error downloading PDF: {str(e)}")
+                return []
         else:
             pdf_path = url
 
