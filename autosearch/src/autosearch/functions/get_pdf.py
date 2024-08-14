@@ -33,7 +33,7 @@ def get_pdf(
     output_dir = project_dir + "/output"
     config_list = project_config.config_list
 
-    search_manager = SearchManager()
+    search_manager = SearchManager(project_dir)
 
     # Determine which API to use based on the URL structure
     if 'arxiv.org' in url:
@@ -44,37 +44,36 @@ def get_pdf(
         return f"Unsupported URL: {url}"
 
     try:
-        metadata = search_manager.get_paper_metadata(url, api_name)
+        paper = search_manager.get_paper_metadata(url, api_name)
     except Exception as e:
         return f"Error retrieving paper metadata: {str(e)}"
 
     message = ''
     if part == 'summary':
+        # Ensure text is always a string
+        text = paper.abstract or paper.summary or "No summary available."
         # Assuming momorized_text function is defined elsewhere and imported
-        momorized_text(metadata['summary'], metadata, project_config)
-        return f"Title: {metadata['title']} Authors: {metadata['authors']} URL: {metadata['pdf_url']} \n\n Summary: {metadata['summary']}"
+        momorized_text(text, paper, project_config)
+        return f"Title: {paper.title} Authors: {', '.join(paper.authors)} URL: {paper.pdf_url or paper.url} \n\n Summary: {paper.abstract or paper.summary}"
 
-    title = f"{metadata['title']} [{metadata['pdf_url']}] updated on {metadata['updated']}"
+    title = f"{paper.title} [{paper.pdf_url or paper.url}] updated on {paper.last_updated_date}"
 
-    if paper_db.check_paper(metadata["pdf_url"], "read_papers"):
+    if paper_db.check_paper(paper.url, "read_papers"):
         print(f"The article, '{title}', has already been read and shared with you in your memory.")
         message += f"The article, '{title}', has already been read and shared with you in your memory.\n"
     else:
         if reason != 'factual_check':
-            check_reason = check_reasoning(reason, metadata["summary"], config_list)
+            check_reason = check_reasoning(reason, paper.abstract or paper.summary, config_list)
             if 'no' in check_reason.lower():
                 return f"The article, '{title}', does not meet the criteria for reading."
 
-        # Download and process the PDF
-        pdf_filename = os.path.basename(metadata['pdf_url']) + ".pdf"
-        pdf_path = os.path.join(output_dir, pdf_filename)
         try:
-            search_manager.download_pdf(url, api_name, pdf_path)
-            chunk_pdf(pdf_path, metadata, project_config, source=api_name)
+            search_manager.download_pdf(paper, output_dir)
+            chunk_pdf(paper, project_config)
         except Exception as e:
             return f"Error downloading or processing PDF: {str(e)}"
 
-    md_filename = f"{os.path.splitext(os.path.basename(metadata['pdf_url']))[0]}.md"
+    md_filename = f"{os.path.basename(paper.pdf_url or paper.url)}.md"
     md_path = os.path.join(f"{output_dir}/markdown", md_filename)
 
     try:

@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from typing import List, Optional
+from autosearch.data.paper import Paper
 
 
 class PaperDatabase:
@@ -43,23 +44,7 @@ class PaperDatabase:
         conn.commit()
         conn.close()
 
-    def add_paper(self, table_name: str, paper_data: dict):
-        """
-        Add a paper to the specified table in the database.
-        Only the URL is mandatory; other fields will use default values if missing.
-
-        Args:
-            table_name (str): The name of the table ('read_abstracts' or 'read_papers').
-            paper_data (dict): A dictionary containing paper information.
-
-        Raises:
-            ValueError: If the 'url' field is missing from paper_data.
-        """
-        if 'url' not in paper_data:
-            raise ValueError("The 'url' field is mandatory for adding a paper.")
-        if 'source' not in paper_data:
-            raise ValueError("The 'source' field is mandatory for adding a paper.")
-
+    def add_paper(self, table_name: str, paper: Paper):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
@@ -69,12 +54,12 @@ class PaperDatabase:
                 (url, title, authors, published_date, last_updated_date, source)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
-                paper_data['url'],
-                paper_data.get('title', ''),
-                paper_data.get('authors', ''),
-                paper_data.get('published_date', ''),
-                paper_data.get('last_updated_date', ''),
-                paper_data['source']
+                paper.url,
+                paper.title,
+                ', '.join(paper.authors),
+                paper.published_date.isoformat() if paper.published_date else '',
+                paper.last_updated_date.isoformat() if paper.last_updated_date else '',
+                paper.source
             ))
         elif table_name == 'read_papers':
             c.execute('''
@@ -82,13 +67,13 @@ class PaperDatabase:
                 (url, title, authors, published_date, last_updated_date, local_path, source)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
-                paper_data['url'],
-                paper_data.get('title', ''),
-                paper_data.get('authors', ''),
-                paper_data.get('published_date', ''),
-                paper_data.get('last_updated_date', ''),
-                paper_data.get('local_path', ''),
-                paper_data['source']
+                paper.url,
+                paper.title,
+                ', '.join(paper.authors),
+                paper.published_date.isoformat() if paper.published_date else '',
+                paper.last_updated_date.isoformat() if paper.last_updated_date else '',
+                paper.local_path,
+                paper.source
             ))
         else:
             conn.close()
@@ -115,7 +100,24 @@ class PaperDatabase:
         conn.close()
         return result is not None
 
-    def get_paper_info(self, url: str, table_name: str) -> Optional[dict]:
+    def check_paper_by_localpath(self, local_path: str) -> bool:
+        """
+        Check if a paper local path exists in the read_papers table.
+
+        Args:
+            local_path (str): The local path of the paper to check.
+
+        Returns:
+            bool: True if the paper exists, False otherwise.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT local_path FROM read_papers WHERE local_path = ?", (local_path,))
+        result = c.fetchone()
+        conn.close()
+        return result is not None
+
+    def get_paper_info(self, url: str, table_name: str) -> Optional[Paper]:
         """
         Retrieve paper information from the specified table.
 
@@ -124,7 +126,7 @@ class PaperDatabase:
             table_name (str): The name of the table to retrieve from.
 
         Returns:
-            Optional[dict]: A dictionary containing paper information if found, None otherwise.
+            Optional[Paper]: A dictionary containing paper information if found, None otherwise.
         """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -132,29 +134,29 @@ class PaperDatabase:
             c.execute("SELECT * FROM read_abstracts WHERE url = ?", (url,))
             result = c.fetchone()
             if result:
-                return {
+                return Paper.from_dict({
                     'url': result[0],
                     'title': result[1],
                     'authors': result[2],
                     'published_date': result[3],
                     'last_updated_date': result[4],
-                    'source': result[5]
-                }
+                    'source': result[5],
+                    'local_path': result[5] if table_name == 'read_papers' else None
+                })
         elif table_name == 'read_papers':
             c.execute("SELECT * FROM read_papers WHERE url = ?", (url,))
             result = c.fetchone()
             if result:
-                return {
+                return Paper.from_dict({
                     'url': result[0],
                     'title': result[1],
                     'authors': result[2],
                     'published_date': result[3],
                     'last_updated_date': result[4],
-                    'local_path': result[5],
-                    'source': result[6]
-                }
-        conn.close()
-        return None
+                    'source': result[5],
+                    'local_path': result[5] if table_name == 'read_papers' else None
+                })
+            return None
 
     def count_papers(self, table_name: str) -> int:
         """

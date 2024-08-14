@@ -3,13 +3,18 @@ from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.exceptions import HttpResponseError
 import os
 import json
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from langchain.schema import Document
 import tiktoken
+import arxiv
+import shutil
 
 from autosearch.analysis import tablehelper as tb
 from autosearch.api.search_manager import SearchManager
-from autosearch.functions.text_analysis import chunk_pdf
+from typing import Callable
+from autosearch.config_types import ProjectConfig
+from autosearch.api.arxiv_api import ArxivAPI
+from autosearch.data.paper import Paper
 
 
 class DocumentAnalyzer:
@@ -19,7 +24,7 @@ class DocumentAnalyzer:
     This class provides methods for analyzing PDFs and creating structured documents from the analyzed data.
     """
 
-    def __init__(self, api_key: str, endpoint: str, project_dir: str):
+    def __init__(self, api_key: str, endpoint: str, project_dir: str, chunk_pdf_func: Callable):
         """
         Initialize the DocumentAnalyzer.
 
@@ -32,7 +37,9 @@ class DocumentAnalyzer:
         self.output_dir = f"{project_dir}/output"
         os.makedirs(f"{self.output_dir}/json", exist_ok=True)
         os.makedirs(f"{self.output_dir}/markdown", exist_ok=True)
-        self.search_manager = SearchManager()
+        self.search_manager = SearchManager(self.project_dir)
+        self.paper_db = self.search_manager.paper_db
+        self.chunk_pdf_func = chunk_pdf_func
 
     def analyze_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -61,7 +68,7 @@ class DocumentAnalyzer:
             print(f"An error occurred: {e}")
             raise
 
-    def create_docs(self, data: Dict[str, Any], max_token_size: int, source_name: str) -> Tuple[List[Document], Dict[str, str], str]:
+    def create_docs(self, data: Dict[str, Any], max_token_size: int, paper: Paper) -> Tuple[List[Document], Dict[str, str], str]:
         """
         Creates documents from input data, separating content based on section headings and page numbers.
 
@@ -78,7 +85,12 @@ class DocumentAnalyzer:
         """
         docs = []
         page_content = {str(i): "" for i in range(1, len(data['pages']) + 1)}
-        full_md_text = ""
+
+        # Extract title from paragraphs
+        title = next((p['content'] for p in data['paragraphs'] if p.get('role') == 'title'), "Untitled Document")
+
+        full_md_text = f"# {title}\n\n"
+
         largest_doc = 0
 
         table_spans = self._collect_table_spans(data['tables'])
@@ -92,7 +104,7 @@ class DocumentAnalyzer:
             if para['type'] == 'section_heading':
                 if current_section:
                     docs, full_md_text, largest_doc = self._add_document(
-                        docs, current_text, current_pages, source_name, max_token_size, full_md_text, largest_doc
+                        docs, current_text, current_pages, paper.source, max_token_size, full_md_text, largest_doc
                     )
                 current_section = para['content']
                 current_text = f"## {current_section}\n\n"
@@ -107,7 +119,7 @@ class DocumentAnalyzer:
         # Add the last document
         if current_section:
             docs, full_md_text, largest_doc = self._add_document(
-                docs, current_text, current_pages, source_name, max_token_size, full_md_text, largest_doc
+                docs, current_text, current_pages, paper.source, max_token_size, full_md_text, largest_doc
             )
 
         print(f"Created {len(docs)} docs with a total of {self.count_tokens(full_md_text)} tokens. Largest doc has {largest_doc} tokens.")
@@ -224,7 +236,7 @@ class DocumentAnalyzer:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=4)
 
-    def analyze_and_create_docs(self, pdf_path: str, max_token_size: int = 3000
+    def analyze_and_create_docs(self, pdf_path: str, paper: Paper, max_token_size: int = 3000
                                 ) -> Tuple[List[Document], Dict[str, str], str]:
         """
         Analyze a PDF and create structured documents from it.
@@ -240,107 +252,85 @@ class DocumentAnalyzer:
         """
         analysis_result = self.analyze_pdf(pdf_path)
         self.save_analysis_result(analysis_result, f"{self.output_dir}/json/{os.path.basename(pdf_path)}.json")
-        return self.create_docs(analysis_result,
-                                max_token_size=max_token_size,
-                                source_name=os.path.basename(pdf_path))
+        return self.create_docs(analysis_result, max_token_size=max_token_size, paper=paper)
 
-    def pdf2md_chunck(self, url: str, max_token_size: int = 3000) -> List[Document]:
-        """
-        Analyze a PDF and create structured documents from it.
+    def pdf2md_chunck(self, paper: Paper, max_token_size: int = 3000) -> List[Document]:
+        pdf_filename = os.path.basename(paper.url)
+        # add .pdf extension if missing
+        if not pdf_filename.endswith('.pdf'):
+            pdf_filename += '.pdf'
+        pdf_path = os.path.join(self.output_dir, pdf_filename)
 
-        This method combines the analyze_pdf and create_docs steps.
-
-        Args:
-            url (str): The url or path to the PDF file.
-            max_token_size (int): The maximum token size for each created document. Defaults to 3000.
-
-        Returns:
-            List[Document]: A list of created documents.
-        """
-        if url[-4:] != ".pdf":
-            pdf_filename = url.split('/')[-1] + ".pdf"
-        else:
-            pdf_filename = url.split('/')[-1]
-
-        if url.startswith("http"):
-            # Determine which API to use based on the URL structure
-            if 'arxiv.org' in url:
-                api_name = 'arxiv'
-            elif 'scholar.google.com' in url:
-                api_name = 'google_scholar'
-            else:
-                raise ValueError(f"Unsupported URL: {url}")
-
-            # Download the PDF
+        if paper.source == 'local':
+            # Handle local files
+            source_path = paper.local_path if paper.local_path and os.path.exists(paper.local_path) else paper.url
             try:
-                pdf_path = self.search_manager.download_pdf(pdf_filename, api_name, self.output_dir)
+                shutil.copy2(source_path, pdf_path)
+                paper.local_path = pdf_path
             except Exception as e:
-                print(f"Error downloading PDF: {str(e)}")
-                return []
+                print(f"Error copying local PDF for {paper.title}: {str(e)}")
+                raise
+        elif paper.url.startswith('http'):
+            # Handle remote files
+            try:
+                # check if the PDF file is already downloaded
+                if os.path.exists(pdf_path):
+                    print(f"PDF file already exists: {pdf_path}")
+                else:
+                    self.search_manager.download_pdf(paper, self.output_dir)
+            except Exception as e:
+                print(f"Error downloading PDF for {paper.title}: {str(e)}")
+                raise
         else:
-            pdf_path = url
+            raise FileNotFoundError(f"PDF file not found: {paper.url, pdf_path, paper.source, paper.local_path}")
 
-        docs, _, fullmdtext = self.analyze_and_create_docs(pdf_path, max_token_size)
+        docs, _, fullmdtext = self.analyze_and_create_docs(pdf_path, paper, max_token_size)
 
         # write fullmdtext to a file
-        with open(f"{self.output_dir}/markdown/{pdf_filename}.md", "w") as f:
+        md_filename = pdf_filename.replace('.pdf', '.md')
+        with open(f"{self.output_dir}/markdown/{md_filename}", "w") as f:
             f.write(fullmdtext)
 
         return docs
 
-    def extract_text_and_title_from_pdf(self, pdf_path: str) -> Tuple[str, str]:
-
-        docs = self.pdf2md_chunck(pdf_path)
-        md_file = f"{self.output_dir}/markdown/{os.path.basename(pdf_path)}.md"
+    def extract_text_and_title_from_pdf(self, paper: Paper) -> Tuple[str, str]:
+        docs = self.pdf2md_chunck(paper)
+        md_file = f"{self.output_dir}/markdown/{os.path.basename(paper.url).replace('.pdf', '.md')}"
         with open(md_file, "r") as f:
             full_md_text = f.read()
 
         # Extract title from the first document chunk
-        title = docs[0].page_content.split('\n', 1)[0] if docs else os.path.basename(pdf_path)
+        title = full_md_text.split('\n')[0].replace('# ', '') if docs else paper.title
 
         return full_md_text, title
 
-    def process_local_pdf(self, pdf_path: str, project_config) -> Dict[str, Any]:
-
+    def process_local_pdf(self, paper: Paper, project_config: ProjectConfig) -> Paper:
         try:
             # Extract text and title from PDF using pdf2md_chunck
-            pdf_text, pdf_title = self.extract_text_and_title_from_pdf(pdf_path)
+            pdf_text, pdf_title = self.extract_text_and_title_from_pdf(paper)
 
             # Try to get metadata by searching for the PDF title
             metadata = self.search_for_metadata(pdf_title)
 
-            if not metadata:
-                metadata = {
-                    'title': pdf_title,
-                    'authors': 'Unknown',
-                    'published': 'Unknown',
-                    'updated': 'Unknown',
-                    'summary': pdf_text[:500] + "..."  # Use first 500 characters as summary
-                }
-
-            # Add paper to database
-            paper_data = {
-                'url': f"local:{pdf_path}",
-                'local_path': pdf_path,
-                'title': metadata['title'],
-                'authors': metadata['authors'],
-                'published_date': metadata.get('published', 'Unknown'),
-                'last_updated_date': metadata.get('updated', 'Unknown'),
-                'source': 'local'
-            }
+            if metadata:
+                local_path = paper.url
+                paper = metadata
+                paper.local_path = local_path
+                paper.source = 'local'
+            else:
+                paper.title = pdf_title
+                paper.abstract = pdf_text[:500] + "..."  # Use first 500 characters as abstract
 
             # Chunk the PDF and add to memory using the existing chunk_pdf function
-            chunk_pdf(pdf_path, paper_data, project_config)
+            self.chunk_pdf_func(paper, project_config)
 
-            return {
-                'metadata': metadata,
-                'full_text': pdf_text
-            }
+            return paper
 
         except Exception as e:
-            raise Exception(f"Error processing {pdf_path}: {str(e)}")
+            print(f"Error processing {paper.url}: {str(e)}")
+            raise Exception(f"Error processing {paper.url}: {str(e)}")
 
-    def search_for_metadata(self, title: str) -> Dict[str, Any]:
+    def search_for_metadata(self, title: str) -> Optional[Paper]:
         try:
             # Search across all APIs
             results = self.search_manager.search_all(title, n_results=1)
@@ -348,8 +338,51 @@ class DocumentAnalyzer:
             # Check if we got any results
             for api_results in results.values():
                 if api_results:
-                    return api_results[0]
+                    return api_results[0]  # Assuming search_all now returns Paper objects
 
-            return {}
+            return None
         except Exception:
-            return {}
+            return None
+
+    def _get_arxiv_metadata(self, pdf_path: str) -> Optional[Dict[str, Any]]:
+        try:
+            file_name = os.path.basename(pdf_path).replace('.pdf', '')
+            paper_id = ArxivAPI._extract_arxiv_id(file_name)
+            search = arxiv.Search(id_list=[paper_id])
+            result = next(arxiv.Client().results(search))
+            return {
+                'title': result.title,
+                'authors': ','.join([author.name for author in result.authors]),
+                'published': result.published,
+                'updated': result.updated,
+                'summary': result.summary
+            }
+        except Exception:
+            return None
+
+    def _create_default_metadata(self, title: str, text: str) -> Dict[str, Any]:
+        return {
+            'title': title,
+            'authors': 'Unknown',
+            'published': 'Unknown',
+            'updated': 'Unknown',
+            'summary': text[:500] + "..."  # Use first 500 characters as summary
+        }
+
+    def _validate_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        required_fields = ['title', 'authors', 'published', 'updated', 'summary']
+        for field in required_fields:
+            if field not in metadata or not metadata[field]:
+                metadata[field] = 'Unknown'
+        return metadata
+
+    def _create_paper_data(self, pdf_path: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'url': pdf_path,
+            'local_path': pdf_path,
+            'title': metadata['title'],
+            'authors': metadata['authors'],
+            'published_date': metadata.get('published', 'Unknown'),
+            'last_updated_date': metadata.get('updated', 'Unknown'),
+            'source': 'local'
+        }

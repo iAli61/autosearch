@@ -36,3 +36,6 @@ autosearch/notebooks/papers
 deep_quantum_chemistry/s41586-023-06735-9.pdf
 *Zone.Identifier
 project_files
+autosearch_projects/polymer_representation/papers
+autosearch_projects/polymer_representation/polymer_representation/
+*logs.db-journal

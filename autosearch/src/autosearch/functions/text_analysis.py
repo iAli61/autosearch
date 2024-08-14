@@ -1,15 +1,17 @@
 from autosearch.functions.create_teachable_groupchat import create_teachable_groupchat
+from autosearch.project_config import ProjectConfig
+from autosearch.data.paper import Paper
 from autogen.formatting_utils import colored
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
 
-def momorized_text(text, metadata, project_config):
+def momorized_text(text: str, paper: Paper, project_config: ProjectConfig):
 
     db_dir = project_config.db_dir
     config_list = project_config.config_list
 
-    title = f"{metadata['title']} [{metadata['pdf_url']}] updated on {metadata['updated']}"
+    title = f"{paper.title} [{paper.url}] updated on {paper.last_updated_date or ""}"
 
     paper_reader, reader_user = create_teachable_groupchat("paper_reader", "reader_user", db_dir, config_list, verbosity=0)
     try:
@@ -21,13 +23,12 @@ def momorized_text(text, metadata, project_config):
         print(colored(f"text: {text}", "red"))
 
 
-def chunk_pdf(url, metadata, project_config, source="arxiv"):
+def chunk_pdf(paper: Paper, project_config: ProjectConfig):
 
     paper_db = project_config.paper_db
     doc_analyzer = project_config.doc_analyzer
-    project_dir = project_config.project_dir
 
-    chunked_elements = doc_analyzer.pdf2md_chunck(url)
+    chunked_elements = doc_analyzer.pdf2md_chunck(paper)
 
     # find checked_elemnt that includes "REFERENCES" in the second half of the text
 
@@ -39,17 +40,10 @@ def chunk_pdf(url, metadata, project_config, source="arxiv"):
             chunked_elements = chunked_elements[:i]
             break
 
+    print(f"Processing {len(chunked_elements)} chunks from {paper.title}...")
     with ThreadPoolExecutor() as executor:  # type: ignore
-        futures = [executor.submit(momorized_text, chunk.page_content, metadata, project_config) for chunk in chunked_elements if len(chunk.page_content.split()) > 30]
+        futures = [executor.submit(momorized_text, chunk.page_content, paper, project_config) for chunk in chunked_elements if len(chunk.page_content.split()) > 30]
         for future in as_completed(futures):
             future.result()
 
-    paper_data = {'url': url,
-                  'local_path': metadata.get('local_path', project_dir),
-                  'title': metadata['title'],
-                  'authors': metadata['authors'],
-                  'published_date': metadata['published'],
-                  'last_updated_date': metadata['updated'],
-                  'source': source
-                  }
-    paper_db.add_paper("read_papers", paper_data)  # Add paper to the database
+    paper_db.add_paper("read_papers", paper)  # Add paper to the database

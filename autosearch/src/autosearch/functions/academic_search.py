@@ -18,20 +18,19 @@ def academic_search(
     query: Annotated[str, "The query to search for in academic sources."],
     project_config: ProjectConfig,
 ) -> str:
-    search_manager = SearchManager()
+    project_dir = project_config.project_dir
+    search_manager = SearchManager(project_dir)
     results = search_manager.search_all(query, n_results=5)
 
     output = ""
     for source, papers in results.items():
         output += f"\nResults from {source}:\n"
         for i, paper in enumerate(papers, 1):
-            output += f"\n{i}. Title: {paper['title']}\n"
-            output += f"   Authors: {paper['authors']}\n"
-            output += f"   URL: {paper.get('pdf_url') or paper.get('url')}\n"
-            if 'published' in paper:
-                output += f"   Published: {paper['published']}\n"
-            elif 'year' in paper:
-                output += f"   Year: {paper['year']}\n"
+            output += f"\n{i}. Title: {paper.title}\n"
+            output += f"   Authors: {', '.join(paper.authors)}\n"
+            output += f"   URL: {paper.pdf_url or paper.url}\n"
+            if paper.published_date:
+                output += f"   Published: {paper.published_date}\n"
 
     if not output:
         return "No papers found in academic sources for the given query."

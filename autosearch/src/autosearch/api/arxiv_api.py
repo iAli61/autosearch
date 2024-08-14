@@ -1,14 +1,15 @@
 import arxiv
-from typing import List, Dict, Any
+from typing import List, Dict
 from .search_api_base import SearchAPIBase
 import os
 import re
 from urllib.parse import urlparse
+from autosearch.data.paper import Paper
 
 
 class ArxivAPI(SearchAPIBase):
 
-    def search(self, query: str, n_results: int = 10) -> List[Dict[str, Any]]:
+    def search(self, query: str, n_results: int = 10) -> List[Paper]:
         search = arxiv.Search(
             query=query,
             max_results=n_results,
@@ -25,20 +26,31 @@ class ArxivAPI(SearchAPIBase):
                 'published': result.published.strftime('%Y-%m-%d'),
                 'updated': result.updated.strftime('%Y-%m-%d')
             })
-        return results
+        return [Paper(
+            title=result.title,
+            authors=[author.name for author in result.authors],
+            url=result.entry_id,
+            pdf_url=result.pdf_url,
+            abstract=result.summary,
+            published_date=result.published,
+            last_updated_date=result.updated,
+            source='arxiv'
+        ) for result in search.results()]
 
-    def get_paper_metadata(self, identifier: str) -> Dict[str, Any]:
+    def get_paper_metadata(self, identifier: str) -> Paper:
         arxiv_id = self._extract_arxiv_id(identifier)
         paper = next(arxiv.Search(id_list=[arxiv_id]).results())
 
-        return {
-            'title': paper.title,
-            'authors': ', '.join(author.name for author in paper.authors),
-            'summary': paper.summary,
-            'pdf_url': paper.pdf_url,
-            'published': paper.published.strftime('%Y-%m-%d'),
-            'updated': paper.updated.strftime('%Y-%m-%d')
-        }
+        return Paper(
+            title=paper.title,
+            authors=[author.name for author in paper.authors],
+            url=paper.entry_id,
+            pdf_url=paper.pdf_url,
+            abstract=paper.summary,
+            published_date=paper.published,
+            last_updated_date=paper.updated,
+            source='arxiv'
+        )
 
     @staticmethod
     def download_pdf(identifier: str, save_path: str) -> str:
@@ -58,6 +70,9 @@ class ArxivAPI(SearchAPIBase):
 
         # Ensure the directory exists
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        # chech if save_path has .pdf extention or not
+        if not save_path.endswith('.pdf'):
+            save_path += '.pdf'
 
         # Download the PDF
         result.download_pdf(filename=save_path)
