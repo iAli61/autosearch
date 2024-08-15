@@ -10,7 +10,7 @@ class SearchManager:
     def __init__(self, project_dir):
         self.apis = {
             'arxiv': ArxivAPI(),
-            'google_scholar': GoogleScholarAPI(),
+            'google_scholar': GoogleScholarAPI(timeout=30),  # Set a 30-second timeout
             # Add more APIs here as they are implemented
         }
         self.projet_dir = project_dir

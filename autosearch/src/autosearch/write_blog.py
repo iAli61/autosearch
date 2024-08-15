@@ -14,8 +14,6 @@ import re
 class WriteBlog(ResearchProject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.instruction_creator = None
-        self.outline_creator = None
 
     def run(self, title: str, target_audience: str):
         """
@@ -35,7 +33,7 @@ class WriteBlog(ResearchProject):
         self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'])
         self.instruction = self.instruction_creator.run(title, target_audience, silent=False)
         # Create outline
-        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=150)
+        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=300)
 
         def write_section(
                 title: Annotated[str, "The title of the section."],
@@ -46,7 +44,7 @@ class WriteBlog(ResearchProject):
             module = importlib.import_module('autosearch.communities.write_section_agents')
             agentsconfig = getattr(module, "agentsconfig")
             agents = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
-            section_writer = SectionWriter(self.ProjectConfig, agents, max_round=20)
+            section_writer = SectionWriter(self.ProjectConfig, agents, max_round=50)
             return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)
 
         # find blog_editor agent in self.agents_groups['outline_agents']
@@ -70,6 +68,9 @@ class WriteBlog(ResearchProject):
 
         print(f"Overall word count: {overall_word_count}")
 
+        sections = self._write_sections(titles, briefs, mind_map)
+        return self.postprocessing(sections)
+
     def _write_sections(self, titles, briefs, mind_map):
         def write_section(
                 title: Annotated[str, "The title of the section."],
@@ -80,7 +81,7 @@ class WriteBlog(ResearchProject):
             module = importlib.import_module('autosearch.communities.write_section_agents')
             agentsconfig = getattr(module, "agentsconfig")
             agents = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
-            section_writer = SectionWriter(self.ProjectConfig, agents, max_round=20)
+            section_writer = SectionWriter(self.ProjectConfig, agents, max_round=50)
             return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)
 
         agents_dict = {k: v for d in self.agents_groups['outline_agents'] for k, v in d.items()}
