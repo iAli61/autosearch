@@ -35,6 +35,7 @@ class Teachability(AgentCapability):
         recall_threshold: Optional[float] = 1.5,
         max_num_retrievals: Optional[int] = 10,
         llm_config: Optional[Union[Dict, bool]] = None,
+        learnable: bool = True,
     ):
         """
         Args:
@@ -51,6 +52,7 @@ class Teachability(AgentCapability):
         self.recall_threshold = recall_threshold
         self.max_num_retrievals = max_num_retrievals
         self.llm_config = llm_config
+        self.learnable = learnable
 
         self.analyzer = None
         self.teachable_agent = None
@@ -95,7 +97,8 @@ class Teachability(AgentCapability):
                 print(colored(f"\nexpanded_text: {expanded_text}", "magenta"))
 
         # Try to store any user teachings in new memos to be used in the future.
-        self._consider_memo_storage(text)
+        if self.learnable:
+            self._consider_memo_storage(text)
 
         # Return the (possibly) expanded message text.
         return expanded_text

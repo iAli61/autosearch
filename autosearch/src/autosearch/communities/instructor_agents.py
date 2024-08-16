@@ -18,7 +18,8 @@ Your input will form the technical foundation of the article instruction.
         """,
         "description": "Provides deep, subject-specific insights on the given topic, tailored to the target audience.",
         "function_list": ["academic_search", "academic_retriever"],
-        "teachable": True
+        "teachable": True,
+        "learnable": False,
     },
     {
         "name": "structure_specialist",
@@ -35,7 +36,8 @@ Your suggestions will guide the Editor-in-Chief in organizing the article effect
         """,
         "description": "Outlines effective structures for articles on given topics, considering the target audience.",
         "function_list": [],
-        "teachable": False
+        "teachable": False,
+        "learnable": False,
     },
     {
         "name": "audience_adaptation_expert",
@@ -52,7 +54,8 @@ Your input will help make the article engaging and comprehensible to the intende
         """,
         "description": "Ensures articles are accessible to the specified target audience while maintaining scientific rigor.",
         "function_list": [],
-        "teachable": False
+        "teachable": False,
+        "learnable": False,
     },
     {
         "name": "research_resource_expert",
@@ -69,7 +72,8 @@ Your suggestions will ensure the article is well-researched and up-to-date, with
         """,
         "description": "Identifies key resources and research methods for articles, considering the target audience.",
         "function_list": ["academic_search", "academic_retriever", "get_pdf"],
-        "teachable": True
+        "teachable": True,
+        "learnable": False,
     },
     {
         "name": "instruction_synthesizer",
@@ -86,7 +90,8 @@ Your output will be the final instruction sent to the Editor-in-Chief to guide t
         """,
         "description": "Compiles and refines inputs from other agents into a cohesive instruction for the Editor-in-Chief, tailored to the target audience.",
         "function_list": [],
-        "teachable": False
+        "teachable": False,
+        "learnable": False,
     }
 ]
 

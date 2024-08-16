@@ -19,6 +19,9 @@ def speaker_selection_func(last_speaker: autogen.Agent, groupchat: autogen.Group
     if 'OUTLINE' in messages[-1]['content']:
         return critic
 
+    if last_speaker == critic and messages[-1]["content"] == "FEEDBACK:":
+        return blog_editor
+
     return 'auto'
 
 

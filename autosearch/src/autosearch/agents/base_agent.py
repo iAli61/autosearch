@@ -1,3 +1,4 @@
+import random
 import autogen
 from dataclasses import dataclass
 from typing import List, Optional, Union
@@ -22,6 +23,7 @@ class AgentConfig:
     description: str
     function_list: Optional[List[BaseFunction]] = None
     teachable: Optional[TeachabilityConfig] = None
+    learnable: Optional[bool] = True
 
 
 class BaseAgent(autogen.AssistantAgent):
@@ -34,6 +36,7 @@ class BaseAgent(autogen.AssistantAgent):
                  agent_config: AgentConfig,
                  project_config: ProjectConfig,
                  executor: Union[autogen.ConversableAgent, None] = None,
+                 prefix: Optional[str] = None,
                  **kwargs
                  ):
         """
@@ -51,8 +54,12 @@ class BaseAgent(autogen.AssistantAgent):
             "timeout": 120,
             # "seed": 42,
         }
+        if prefix:
+            _name = f"{prefix}_{agent_config.name}"
+        else:
+            _name = agent_config.name
         super().__init__(
-            name=agent_config.name,
+            name=_name,
             system_message=agent_config.system_message,
             description=agent_config.description,
             llm_config=self.llm_config
@@ -63,7 +70,8 @@ class BaseAgent(autogen.AssistantAgent):
                 verbosity=int(getattr(self.agent_config.teachable, 'verbosity', getattr(self.project_config, 'verbosity', 0))),
                 reset_db=getattr(self.agent_config.teachable, 'reset_db', getattr(self.project_config, 'reset_db', False)),
                 path_to_db_dir=getattr(self.agent_config.teachable, 'db_dir', getattr(self.project_config, 'db_dir', self.project_config.project_dir + '/db')),
-                recall_threshold=getattr(self.agent_config.teachable, 'recall_threshold', getattr(self.project_config, 'recall_threshold', 1.5))
+                recall_threshold=getattr(self.agent_config.teachable, 'recall_threshold', getattr(self.project_config, 'recall_threshold', 1.5)),
+                learnable=getattr(self.agent_config.teachable, 'learnable', True)
             )
             teachability.add_to_agent(self)
 
@@ -92,7 +100,7 @@ class BaseAgent(autogen.AssistantAgent):
 
         autogen.agentchat.register_function(
             f=func.func,
-            name=func.name,
+            name=func.name + f"_{self.name}_{random.randint(0, 100000)}",
             caller=self,
             executor=executor,
             description=func.description

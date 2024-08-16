@@ -5,17 +5,93 @@ from autosearch.chat.outline_creator import OutlineCreator
 from autosearch.chat.instruction_creator import InstructionCreator
 from autosearch.chat.write_section import SectionWriter
 from autosearch.agents.agents_creator import AgentsCreator
+from random import randint
 from typing_extensions import Annotated
 import autogen
 import importlib
 import re
+import os
+
+Instruction = """
+Dear Editor-in-Chief,
+You are tasked with writing an article titled "Exploring the Intricacies of Polymer Representation: Unraveling Complexity" for a target audience of graduate students and early-career researchers in polymer science and materials engineering. This article should provide an in-depth exploration of polymer representation methods, their complexities, and their importance in advancing polymer science. Please follow these guidelines:
+
+1-Introduction (300-400 words):
+    - Begin with a brief overview of polymers and their significance in materials science.
+    - Introduce the concept of polymer representation and why it's crucial for understanding and manipulating polymer properties.
+    - Outline the main challenges in representing complex polymer structures.
+
+2-Fundamental Concepts of Polymer Representation (500-600 words):
+    - Explain the basic principles of polymer representation, including chemical structure, topology, and configuration.
+    - Discuss the importance of accurately capturing both the molecular and macroscopic properties of polymers.
+    - Introduce key terminology and concepts that will be used throughout the article.
+
+3-Common Methods of Polymer Representation (600-700 words):
+    - Describe and compare various methods used for representing polymers, such as:
+        - Chemical formula representation
+        - Graph-based representations
+        - SMILES and SMARTS notations
+        - Matrix-based representations
+    - Explain the strengths and limitations of each method, providing examples where appropriate.
+
+4-Advanced Techniques in Polymer Representation (700-800 words):
+    - Explore cutting-edge approaches to polymer representation, such as:
+        - Machine learning-based representations
+        - Topological data analysis
+        - Multiscale modeling approaches
+    - Discuss how these advanced techniques address the limitations of traditional methods.
+    - Provide examples of how these techniques have been applied in recent research.
+
+5-Challenges and Complexities (500-600 words):
+    - Delve into the difficulties of representing complex polymer systems, such as:
+        - Branched and crosslinked polymers
+        - Block copolymers and polymer blends
+        - Dynamic and responsive polymers
+    - Explain how these challenges impact polymer design, characterization, and application.
+
+6- Applications and Future Directions (400-500 words):
+    - Discuss the practical applications of polymer representation in various fields, such as drug delivery, materials engineering, and nanotechnology.
+    - Explore emerging trends and future directions in polymer representation research.
+    - Highlight the potential impact of improved representation methods on polymer science and technology.
+
+7- Conclusion (200-300 words):
+    - Summarize the key points discussed in the article.
+    - Emphasize the importance of continued research in polymer representation for advancing materials science.
+    - Encourage readers to explore the field further and consider its potential impact on their own research.
+
+Throughout the article:
+
+Use clear, concise language appropriate for graduate students and early-career researchers.
+Incorporate relevant examples and case studies to illustrate complex concepts.
+Include 2-3 figures or diagrams to visually represent key ideas (e.g., a comparison of different representation methods, a flowchart of the challenges in polymer representation).
+Cite 10-15 recent, peer-reviewed sources to support your points and provide readers with resources for further reading.
+Use analogies and real-world applications to make abstract concepts more relatable to the target audience.
+Maintain a balance between technical depth and accessibility, ensuring that the content is challenging yet comprehensible for the intended readers.
+
+Word count: Aim for a total of 3200-3900 words for the main body of the article (excluding references).
+Remember to engage your audience by highlighting the exciting possibilities and challenges in this field, and how advancements in polymer representation can lead to breakthroughs in materials science and engineering.
+"""
 
 
 class WriteBlog(ResearchProject):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, title, target_audience, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.title = title
+        self.target_audience = target_audience
+        self.instruction = Instruction
 
-    def run(self, title: str, target_audience: str):
+    def write_instruction(self):
+        """
+        Create the instruction for the blog post.
+
+        Args:
+            title (str): The title of the article.
+            target_audience (str): The target audience for the article.
+        """
+        self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'])
+        self.instruction = self.instruction_creator.run(self.title, self.target_audience, silent=False)
+
+    def run(self):
         """
         Execute the entire research workflow.
 
@@ -26,39 +102,9 @@ class WriteBlog(ResearchProject):
         Returns:
             str: The final blog post.
         """
-        self.title = title
-        self.target_audience = target_audience
-
-        # Create instruction
-        self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'])
-        self.instruction = self.instruction_creator.run(title, target_audience, silent=False)
+        # self.write_instruction()
         # Create outline
-        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=300)
-
-        def write_section(
-                title: Annotated[str, "The title of the section."],
-                brief: Annotated[str, "A clear, detailed brief about what the section should include."],
-                mind_map: Annotated[str, "The Graphviz code for the mind map of the entire blog post."],
-                silent: Annotated[bool, "It should always be True."] = True
-        ):
-            module = importlib.import_module('autosearch.communities.write_section_agents')
-            agentsconfig = getattr(module, "agentsconfig")
-            agents = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
-            section_writer = SectionWriter(self.ProjectConfig, agents, max_round=50)
-            return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)
-
-        # find blog_editor agent in self.agents_groups['outline_agents']
-        agents_dict = {k: v for d in self.agents_groups['outline_agents'] for k, v in d.items()}
-        blog_editor = agents_dict.get("blog_editor-in-chief", None)
-        if blog_editor is None:
-            raise ValueError("No blog_editor-in-chief agent found in outline_agents")
-        autogen.agentchat.register_function(
-            f=write_section,
-            name="write_section",
-            caller=blog_editor,
-            executor=agents_dict['editor_user'],
-            description="Write a section based on the given title, brief, and mind map.",
-        )
+        self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=100)
 
         mind_map, titles, briefs, overall_word_count = self.outline_creator.run(
             title=self.title,
@@ -80,27 +126,23 @@ class WriteBlog(ResearchProject):
         ):
             module = importlib.import_module('autosearch.communities.write_section_agents')
             agentsconfig = getattr(module, "agentsconfig")
-            agents = AgentsCreator(self.ProjectConfig, agents_config=agentsconfig).initialize_agents()
+            prefix = f"section_{randint(0, 1000)}"
+            agents = AgentsCreator(self.ProjectConfig,
+                                   agents_config=agentsconfig,
+                                   prefix=prefix
+                                   ).initialize_agents()
             section_writer = SectionWriter(self.ProjectConfig, agents, max_round=50)
             return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)
 
-        agents_dict = {k: v for d in self.agents_groups['outline_agents'] for k, v in d.items()}
-        blog_editor = agents_dict.get("blog_editor-in-chief", None)
-        if blog_editor is None:
-            raise ValueError("No blog_editor-in-chief agent found in outline_agents")
-
-        autogen.agentchat.register_function(
-            f=write_section,
-            name="write_section",
-            caller=blog_editor,
-            executor=agents_dict['editor_user'],
-            description="Write a section based on the given title, brief, and mind map.",
-        )
-
         sections = []
         for title, brief in zip(titles, briefs):
-            section = write_section(title=title, brief=brief, mind_map=mind_map)
-            sections.append(section)
+            section_file = f'{self.result_dir}/section_{title}.md'
+            if os.path.exists(section_file):
+                with open(section_file, 'r') as f:
+                    section = f.read()
+            else:
+                section = write_section(title=title, brief=brief, mind_map=mind_map)
+                sections.append(section)
 
         return sections
 
@@ -140,7 +182,7 @@ class WriteBlog(ResearchProject):
                 print(f"the following sections does not have Citations: {secs}")
 
         blog_sections = f"# {self.title}\n\n"
-        blog_sections += "\n\n".join(f'## {i}. {section}' for i, section in enumerate(section_text, start=1))
+        blog_sections += "\n\n".join(f'{section}' for section in section_text)
         blog_sections += "Citations: \n"
         blog_sections += '\n'.join(section_refs)
 

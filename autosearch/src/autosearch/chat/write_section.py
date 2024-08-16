@@ -96,7 +96,8 @@ class SectionWriter(ResearchGroupChat):
         graph = [mes for mes in chat_hist.chat_history if 'GRAPH:' in mes['content']]
         coherence_feedback = [mes for mes in chat_hist.chat_history if 'COHERENCE_FEEDBACK:' in mes['content']]
 
-        output = writer_messages[-1]['content'].replace("TXT:", "").replace("END_TXT", "") if writer_messages else "No response from the writer."
+        output = f"BRIEF: {brief}\n\n# {title}"
+        output += writer_messages[-1]['content'].replace("TXT:", "").replace("END_TXT", "") if writer_messages else "No response from the writer."
         graph_output = graph[-1]['content'].replace("GRAPH:", "").replace("END_GRAPH", "") if graph else "No graph from the image developer."
         feedback = coherence_feedback[-1]['content'].replace("COHERENCE_FEEDBACK:", "").replace("END_COHERENCE_FEEDBACK", "") if coherence_feedback else "No coherence feedback provided."
 

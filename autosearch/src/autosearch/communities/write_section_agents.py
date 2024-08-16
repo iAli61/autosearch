@@ -1,6 +1,6 @@
 from autosearch.agents.base_agent import AgentConfig
 
-editoral_agents_config = [
+write_section_agents_config = [
     {
         "system_message": """
 You are now part of a group chat dedicated to completing a collaborative blog project. As a data_research_writer, your role is to develop a well-researched section of a blog post on a specified topic. You will follow a detailed brief that outlines the necessary content for each part of the section, while also considering the overall structure of the blog post as shown in the mind map.
@@ -68,7 +68,8 @@ Formatting Requirements:
         "name": "image_developer",
         "description": "The Graphviz Image Developer is an expert in creating visual representations of graphs and networks, ensuring consistency with the overall blog structure.",
         "function_list": [],
-        "teachable": False
+        "teachable": False,
+        "learnable": False
     },
     {
         "system_message": """
@@ -94,8 +95,9 @@ Upon completing your review and providing feedback for a section, signify your c
         "name": "coherence_coordinator",
         "description": "The Coherence Coordinator ensures that each section of the blog post maintains coherence with the overall structure and flows seamlessly from one section to another.",
         "function_list": [],
-        "teachable": False
+        "teachable": False,
+        "learnable": False
     }
 ]
 
-agentsconfig = [AgentConfig(**config) for config in editoral_agents_config]
+agentsconfig = [AgentConfig(**config) for config in write_section_agents_config]

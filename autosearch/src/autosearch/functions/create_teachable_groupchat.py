@@ -21,6 +21,7 @@ def create_teachable_groupchat(assitant_name, user_name, db_dir, config_list,
         reset_db=False,
         path_to_db_dir=db_dir,
         recall_threshold=1.5,  # Higher numbers allow more (but less relevant) memos to be recalled.
+        learnable=True,  # If False, the agent will not learn from user input.
     )
 
     # Now add the Teachability capability to the agent.

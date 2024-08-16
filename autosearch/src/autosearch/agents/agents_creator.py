@@ -1,7 +1,7 @@
 from autosearch.agents.base_agent import AgentConfig, BaseAgent
 from autosearch.agents.utils import termination_msg
 from autosearch.project_config import ProjectConfig
-from typing import List
+from typing import List, Optional
 import autogen
 
 
@@ -9,7 +9,8 @@ class AgentsCreator:
 
     def __init__(self,
                  project_config: ProjectConfig,
-                 agents_config: List[AgentConfig]
+                 agents_config: List[AgentConfig],
+                 prefix: Optional[str] = None
                  ):
         self.project_config = project_config
         self.llm_config = {
@@ -17,6 +18,7 @@ class AgentsCreator:
             "timeout": 120,
         },
         self.agents_config = agents_config
+        self.prefix = prefix
 
     def initialize_agents(self):
 
@@ -34,7 +36,8 @@ class AgentsCreator:
             agent = BaseAgent(
                 agent_config=agent_config,
                 project_config=self.project_config,
-                executor=executor
+                executor=executor,
+                prefix=self.prefix,
             )
             agents.append({agent.name: agent})
 
