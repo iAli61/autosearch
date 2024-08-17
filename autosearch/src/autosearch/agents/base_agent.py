@@ -67,11 +67,11 @@ class BaseAgent(autogen.AssistantAgent):
 
         if self.agent_config.teachable:
             teachability = Teachability(
-                verbosity=int(getattr(self.agent_config.teachable, 'verbosity', getattr(self.project_config, 'verbosity', 0))),
-                reset_db=getattr(self.agent_config.teachable, 'reset_db', getattr(self.project_config, 'reset_db', False)),
-                path_to_db_dir=getattr(self.agent_config.teachable, 'db_dir', getattr(self.project_config, 'db_dir', self.project_config.project_dir + '/db')),
-                recall_threshold=getattr(self.agent_config.teachable, 'recall_threshold', getattr(self.project_config, 'recall_threshold', 1.5)),
-                learnable=getattr(self.agent_config.teachable, 'learnable', True)
+                verbosity=int(getattr(self.agent_config, 'verbosity', getattr(self.project_config, 'verbosity', 0))),
+                reset_db=getattr(self.agent_config, 'reset_db', getattr(self.project_config, 'reset_db', False)),
+                path_to_db_dir=getattr(self.agent_config, 'db_dir', getattr(self.project_config, 'db_dir', self.project_config.project_dir + '/db')),
+                recall_threshold=getattr(self.agent_config, 'recall_threshold', getattr(self.project_config, 'recall_threshold', 1.5)),
+                learnable=getattr(self.agent_config, 'learnable', True)
             )
             teachability.add_to_agent(self)
 
@@ -101,6 +101,7 @@ class BaseAgent(autogen.AssistantAgent):
         autogen.agentchat.register_function(
             f=func.func,
             name=func.name + f"_{self.name}_{random.randint(0, 100000)}",
+            # name=func.name,
             caller=self,
             executor=executor,
             description=func.description

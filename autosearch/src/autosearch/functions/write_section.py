@@ -5,7 +5,7 @@ from autosearch.project_config import ProjectConfig
 
 from typing_extensions import Annotated
 import importlib
-from random import randint
+# from random import randint
 
 
 class WriteSection(BaseFunction):
@@ -27,10 +27,8 @@ def write_section(
 ):
     module = importlib.import_module('autosearch.communities.write_section_agents')
     agentsconfig = getattr(module, "agentsconfig")
-    prefix = f"section_{randint(0, 1000)}"
     agents = AgentsCreator(project_config=project_config,
                            agents_config=agentsconfig,
-                           prefix=prefix
                            ).initialize_agents()
     section_writer = SectionWriter(project_config, agents, max_round=50)
     return section_writer.run(brief=brief, title=title, mind_map=mind_map, silent=silent)

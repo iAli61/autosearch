@@ -174,7 +174,8 @@ Your goal is to ensure that the writing process runs smoothly and results in a c
 """,
         "description": "The Writing Coordinator manages the content creation process, ensuring adherence to the approved outline and facilitating communication between writers and reviewers.",
         "function_list": ["write_section"],
-        "teachable": False
+        "teachable": False,
+        "learnable": False
     }
 ]
 

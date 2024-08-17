@@ -7,7 +7,6 @@ from autosearch.chat.write_section import SectionWriter
 from autosearch.agents.agents_creator import AgentsCreator
 from random import randint
 from typing_extensions import Annotated
-import autogen
 import importlib
 import re
 import os
@@ -88,7 +87,7 @@ class WriteBlog(ResearchProject):
             title (str): The title of the article.
             target_audience (str): The target audience for the article.
         """
-        self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'])
+        self.instruction_creator = InstructionCreator(self.ProjectConfig, self.agents_groups['instructor_agents'], max_round=20)
         self.instruction = self.instruction_creator.run(self.title, self.target_audience, silent=False)
 
     def run(self):
@@ -102,7 +101,7 @@ class WriteBlog(ResearchProject):
         Returns:
             str: The final blog post.
         """
-        # self.write_instruction()
+        self.write_instruction()
         # Create outline
         self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=100)
 

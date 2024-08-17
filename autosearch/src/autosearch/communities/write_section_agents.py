@@ -24,7 +24,8 @@ Upon completing your section, integrating all feedback, and ensuring all parts a
         "name": "data_research_writer",
         "description": "The data_research_writer is responsible for crafting detailed sections of a blog post based on a specific topic outlined in a brief, while maintaining coherence with the overall blog structure.",
         "function_list": [],
-        "teachable": True
+        "teachable": True,
+        "learnable": False
     },
     {
         "system_message": """
@@ -43,7 +44,8 @@ You are now in a group chat tasked with completing a specific project. As a Cont
         "name": "content_review_specialist",
         "description": "The content review specialist ensures the accuracy and quality of information shared within the group chat, maintaining coherence with the overall blog structure.",
         "function_list": ["factual_check", "academic_retriever", "academic_search", "get_pdf"],
-        "teachable": False
+        "teachable": False,
+        "learnable": True
     },
     {
         "system_message": """

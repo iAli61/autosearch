@@ -265,8 +265,17 @@ class DocumentAnalyzer:
             # Handle local files
             source_path = paper.local_path if paper.local_path and os.path.exists(paper.local_path) else paper.url
             try:
-                shutil.copy2(source_path, pdf_path)
-                paper.local_path = pdf_path
+                if not os.path.exists(pdf_path):
+                    shutil.copy2(source_path, pdf_path)
+                    paper.local_path = pdf_path
+                else:
+                    json_file = f"{self.output_dir}/json/{pdf_filename}.json"
+                    if os.path.exists(json_file):
+                        with open(json_file, 'r') as f:
+                            analysis_result = json.load(f)
+                        docs, _, _ = self.create_docs(analysis_result, max_token_size=max_token_size, paper=paper)
+                        return docs
+
             except Exception as e:
                 print(f"Error copying local PDF for {paper.title}: {str(e)}")
                 raise
@@ -311,6 +320,7 @@ class DocumentAnalyzer:
 
             # Try to get metadata by searching for the PDF title
             metadata = self.search_for_metadata(pdf_title)
+            print(f"Metadata found for {paper.url}: {metadata}")
 
             if metadata:
                 local_path = paper.url

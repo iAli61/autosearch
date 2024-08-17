@@ -25,7 +25,8 @@ class ResearchProject:
                  communiteList: List[str], config: Dict[str, Any],
                  config_file: str, initiate_db: bool = False,
                  funcClsList: Optional[List[str]] = None,
-                 local_papers_dir: str = "./papers"
+                 local_papers_dir: str = "./papers",
+                 models: Optional[List[str]] = None
                  ):
         """
         Initialize the ResearchProject.
@@ -38,8 +39,8 @@ class ResearchProject:
         """
         self.project_id = project_id
         self.version = version
-        self.projet_dir = f"./{project_id}/{version}"
-        self.db_dir = f"{self.projet_dir}/db"
+        self.project_dir = f"./{project_id}/{version}"
+        self.db_dir = f"{self.project_dir}/db"
         self.config = config
         self.config_file = config_file
         self.initiate_db = initiate_db
@@ -47,23 +48,23 @@ class ResearchProject:
             self.config_file,
             file_location=".",
             filter_dict={
-                "model": ["gpt-4o", "gpt-4", "gpt-4-32k", "gpt-4o-mini"],
+                "model": [model for model in (models if models is not None else ["gpt-4o", "gpt-4", "gpt-4-32k", "gpt-4o-mini"])]
             },
         )
-        self.paper_db = PaperDatabase(self.projet_dir)
+        self.paper_db = PaperDatabase(self.project_dir)
         self.arxiv_api = ArxivAPI()
-        self.document_analyzer = DocumentAnalyzer(config['doc_api_key'], config['doc_endpoint'], self.projet_dir, chunk_pdf)
+        self.document_analyzer = DocumentAnalyzer(config['doc_api_key'], config['doc_endpoint'], self.project_dir, chunk_pdf)
         if initiate_db:
             memorization_skill(self.db_dir, self.config_list, verbosity=0)
         # Start logging
-        self.logging_session_id = autogen.runtime_logging.start(config={"dbname": f"{self.project_id}/logs.db"})  # type: ignore
+        self.logging_session_id = autogen.runtime_logging.start(config={"dbname": f"{self.project_dir}/logs.db"})  # type: ignore
         print(f"Logging session ID: {str(self.logging_session_id)}")
-        self.result_dir = f"{self.projet_dir}/results/{self.logging_session_id}"
+        self.result_dir = f"{self.project_dir}/results/{self.logging_session_id}"
         os.makedirs(self.result_dir, exist_ok=True)
         self.ProjectConfig = ProjectConfig(
             paper_db=self.paper_db,
             doc_analyzer=self.document_analyzer,
-            project_dir=self.projet_dir,
+            project_dir=self.project_dir,
             db_dir=self.db_dir,
             config_list=self.config_list,
             initiate_db=self.initiate_db,
