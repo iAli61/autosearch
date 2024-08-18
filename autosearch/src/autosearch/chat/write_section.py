@@ -26,7 +26,8 @@ Remember to consider how your section fits into the broader context of the entir
 def speaker_selection_func(last_speaker: autogen.Agent, groupchat: autogen.GroupChat):
     data_research_writer = groupchat.agent_by_name("data_research_writer")
     content_review_specialist = groupchat.agent_by_name("content_review_specialist")
-    image_developer = groupchat.agent_by_name("image_developer")
+    visualization_specialist = groupchat.agent_by_name("visualization_specialist")
+    # graphviz_expert = groupchat.agent_by_name("graphviz_expert")
     coherence_coordinator = groupchat.agent_by_name("coherence_coordinator")
     messages = groupchat.messages
 
@@ -40,10 +41,10 @@ def speaker_selection_func(last_speaker: autogen.Agent, groupchat: autogen.Group
         return coherence_coordinator
 
     if last_speaker == coherence_coordinator and 'COHERENCE_FEEDBACK:' in messages[-1]['content']:
-        return image_developer
+        return visualization_specialist
 
-    if last_speaker == image_developer and 'GRAPH:' in messages[-1]['content']:
-        return data_research_writer  # For potential revisions based on feedback
+    # if last_speaker == image_developer and 'GRAPH:' in messages[-1]['content']:
+    #     return data_research_writer  # For potential revisions based on feedback
 
     return 'auto'
 
@@ -97,7 +98,7 @@ class SectionWriter(ResearchGroupChat):
         graph = [mes for mes in chat_hist.chat_history if 'GRAPH:' in mes['content']]
         coherence_feedback = [mes for mes in chat_hist.chat_history if 'COHERENCE_FEEDBACK:' in mes['content']]
 
-        output = f"BRIEF: {brief}\n\n MINDMAP: {mind_map}\n\n# {title}"
+        output = f"BRIEF: {brief}\n\nMINDMAP:\n```graphviz\n{mind_map}\n```\n\n# {title}"
         output += writer_messages[-1]['content'].replace("TXT:", "").replace("END_TXT", "") if writer_messages else "No response from the writer."
         graph_output = graph[-1]['content'].replace("GRAPH:", "").replace("END_GRAPH", "").replace("dot", "graphviz") if graph else "No graph from the image developer."
         feedback = coherence_feedback[-1]['content'].replace("COHERENCE_FEEDBACK:", "").replace("END_COHERENCE_FEEDBACK", "") if coherence_feedback else "No coherence feedback provided."

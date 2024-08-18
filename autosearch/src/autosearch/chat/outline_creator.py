@@ -19,7 +19,7 @@ def speaker_selection_func(last_speaker: autogen.Agent, groupchat: autogen.Group
     if 'OUTLINE' in messages[-1]['content']:
         return critic
 
-    if last_speaker == critic and messages[-1]["content"] == "FEEDBACK:":
+    if last_speaker == critic and "FEEDBACK" in messages[-1]["content"]:
         return blog_editor
 
     return 'auto'
@@ -72,6 +72,7 @@ class OutlineCreator(ResearchGroupChat):
         """
         # Prepare the response
         editor_messages = [mes for mes in chat_hist.chat_history if 'MINDMAP:' in mes['content'] and 'OUTLINE:' in mes['content']]
+        print(editor_messages)
 
         if not editor_messages:
             return "NO mind map or outline from the Editor-in-Chief.", [], [], 0

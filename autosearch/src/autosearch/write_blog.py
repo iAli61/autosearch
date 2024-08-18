@@ -101,7 +101,7 @@ class WriteBlog(ResearchProject):
         Returns:
             str: The final blog post.
         """
-        self.write_instruction()
+        # self.write_instruction()
         # Create outline
         self.outline_creator = OutlineCreator(self.ProjectConfig, self.agents_groups['outline_agents'], max_round=100)
 
@@ -114,7 +114,11 @@ class WriteBlog(ResearchProject):
         print(f"Overall word count: {overall_word_count}")
 
         sections = self._write_sections(titles, briefs, mind_map)
-        return self.postprocessing(sections)
+        sections = self.postprocessing(sections)
+
+        final_blog_post, final_post_file = self.compile_final_blog_post(self.ProjectConfig, self.title)
+        print(f"Final blog post has been written to: {final_post_file}")
+        return final_blog_post
 
     def _write_sections(self, titles, briefs, mind_map):
         def write_section(
@@ -199,3 +203,58 @@ class WriteBlog(ResearchProject):
             blog_sections = f.read()
 
         return blog_sections
+
+    @staticmethod
+    def compile_final_blog_post(project_config, title):
+        result_dir = f'{project_config.project_dir}/results/{project_config.logging_session_id}'
+
+        # Read the outline file
+        with open(f'{result_dir}/results-{project_config.logging_session_id}.md', 'r') as f:
+            outline = f.read()
+
+        # Extract the mind map
+        mind_map_match = re.search(r'```graphviz\n(.*?)\n```', outline, re.DOTALL)
+        mind_map = mind_map_match.group(1) if mind_map_match else ""
+
+        # Extract titles from the outline
+        titles = re.findall(r'## (.*?)\n', outline)
+
+        # Compile the blog post
+        blog_post = f"# {title}\n\n"
+        blog_post += f"## Mind Map\n\n```graphviz\n{mind_map}\n```\n\n"
+
+        all_references = []
+
+        for title in titles:
+            section_file = f"{result_dir}/section_{title}.md"
+            if os.path.exists(section_file):
+                with open(section_file, 'r') as f:
+                    section_content = f.read()
+
+                # Extract the main content (excluding BRIEF and MINDMAP)
+                main_content = re.search(r'# .*?\n(.*?)\n## Coherence Feedback', section_content, re.DOTALL)
+                if main_content:
+                    blog_post += f"## {title}\n\n{main_content.group(1).strip()}\n\n"
+
+                # Extract references
+                references = re.search(r'Citations:(.*?)(?=```graphviz|$)', section_content, re.DOTALL)
+                if references:
+                    all_references.extend(references.group(1).strip().split('\n'))
+
+                # Add the visualization
+                visualization = re.search(r'```graphviz\n(.*?)\n```', section_content, re.DOTALL)
+                if visualization:
+                    blog_post += f"### Section Visualization\n\n```graphviz\n{visualization.group(1)}\n```\n\n"
+
+        # Add all unique references at the end
+        unique_references = list(set(all_references))
+        blog_post += "\n## References\n\n"
+        for ref in unique_references:
+            blog_post += f"- {ref}\n"
+
+        # Write the final blog post
+        final_post_file = f'{result_dir}/final_blog_post-{project_config.logging_session_id}.md'
+        with open(final_post_file, 'w') as f:
+            f.write(blog_post)
+
+        return blog_post, final_post_file

@@ -63,7 +63,7 @@ Formatting Guidelines:
 Your goal is to ensure a cohesive, high-quality blog post that effectively communicates its subject matter to the target audience. Collaborate closely with the Content Strategist and Writing Coordinator throughout the process.
 """,
         "description": "The blog Editor-in-Chief oversees the entire blog creation process, focusing on high-level planning, quality control, and final approval.",
-        "function_list": ["academic_retriever", "academic_search", "get_pdf", "get_pdfs", "write_section"],
+        "function_list": ["academic_retriever", "academic_search", "get_pdf", "get_pdfs"],
         "teachable": True,
         "learnable": False
     },
