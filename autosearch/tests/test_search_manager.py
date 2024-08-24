@@ -58,8 +58,8 @@ class TestSearchManager(unittest.TestCase):
         self.mock_arxiv_api.download_pdf.assert_called_once_with("http://arxiv.org/abs/1234", "/fake/dir/1234.pdf")
 
     def test_search_and_download(self):
-        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv")]
-        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar")]
+        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv", authors=["Author A"])]
+        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar", authors=["Author B"])]
         self.mock_arxiv_api.download_pdf.return_value = "/fake/dir/1234.pdf"
         self.mock_google_scholar_api.download_pdf.return_value = "/fake/dir/5678.pdf"
 
