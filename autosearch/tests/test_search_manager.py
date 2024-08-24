@@ -38,8 +38,8 @@ class TestSearchManager(unittest.TestCase):
         self.assertEqual(result.title, "Test Paper")
         self.assertEqual(result.url, "http://arxiv.org/abs/1234")
         self.assertEqual(result.source, "arxiv")
-        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", authors=["Author A"])]
-        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", authors=["Author B"])]
+        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv", authors=["Author A"])]
+        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar", authors=["Author B"])]
 
         results = self.search_manager.search_all("quantum computing", 5)
 
