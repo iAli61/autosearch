@@ -21,8 +21,8 @@ class TestSearchManager(unittest.TestCase):
 
     def tearDown(self):
         self.temp_dir.cleanup()
-        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv")]
-        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar")]
+        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv", authors=["Author A"])]
+        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar", authors=["Author B"])]
 
         results = self.search_manager.search_all("quantum computing", 5)
 
@@ -30,7 +30,7 @@ class TestSearchManager(unittest.TestCase):
         self.assertIn('google_scholar', results)
         self.assertEqual(len(results['arxiv']), 1)
         self.assertEqual(len(results['google_scholar']), 1)
-        paper_metadata = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv")
+        paper_metadata = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv", authors=["Author A"])
         self.mock_arxiv_api.get_paper_metadata.return_value = paper_metadata
 
         result = self.search_manager.get_paper_metadata("1234", "arxiv")
@@ -38,8 +38,8 @@ class TestSearchManager(unittest.TestCase):
         self.assertEqual(result.title, "Test Paper")
         self.assertEqual(result.url, "http://arxiv.org/abs/1234")
         self.assertEqual(result.source, "arxiv")
-        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234")]
-        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678")]
+        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", authors=["Author A"])]
+        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", authors=["Author B"])]
 
         results = self.search_manager.search_all("quantum computing", 5)
 
@@ -49,7 +49,7 @@ class TestSearchManager(unittest.TestCase):
         self.assertEqual(len(results['google_scholar']), 1)
 
     def test_download_pdf(self):
-        paper = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv")
+        paper = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv", authors=["Author A"])
         self.mock_arxiv_api.download_pdf.return_value = "/fake/dir/1234.pdf"
 
         pdf_path = self.search_manager.download_pdf(paper, "/fake/dir")
