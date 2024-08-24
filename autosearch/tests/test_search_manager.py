@@ -14,7 +14,15 @@ class TestSearchManager(unittest.TestCase):
         self.mock_paper_db = MockPaperDatabase.return_value
         self.search_manager = SearchManager(project_dir='/fake/dir')
 
-    def test_search_all(self):
+    def test_get_paper_metadata(self):
+        paper_metadata = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv")
+        self.mock_arxiv_api.get_paper_metadata.return_value = paper_metadata
+
+        result = self.search_manager.get_paper_metadata("1234", "arxiv")
+
+        self.assertEqual(result.title, "Test Paper")
+        self.assertEqual(result.url, "http://arxiv.org/abs/1234")
+        self.assertEqual(result.source, "arxiv")
         self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234")]
         self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678")]
 
