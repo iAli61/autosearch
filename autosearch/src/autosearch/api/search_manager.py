@@ -14,7 +14,7 @@ class SearchManager:
             # Add more APIs here as they are implemented
         }
         self.project_dir = project_dir
-        self.paper_db = PaperDatabase(self.projet_dir)
+        self.paper_db = PaperDatabase(self.project_dir)
 
     def search_all(self, query: str, n_results: int = 10) -> Dict[str, List[Paper]]:
         results = {}
