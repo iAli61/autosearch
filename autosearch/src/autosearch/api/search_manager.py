@@ -13,7 +13,7 @@ class SearchManager:
             'google_scholar': GoogleScholarAPI(timeout=30),  # Set a 30-second timeout
             # Add more APIs here as they are implemented
         }
-        self.projet_dir = project_dir
+        self.project_dir = project_dir
         self.paper_db = PaperDatabase(self.projet_dir)
 
     def search_all(self, query: str, n_results: int = 10) -> Dict[str, List[Paper]]:
