@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import tempfile
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
@@ -15,9 +16,11 @@ class TestSearchManager(unittest.TestCase):
         self.mock_arxiv_api = MockArxivAPI.return_value
         self.mock_google_scholar_api = MockGoogleScholarAPI.return_value
         self.mock_paper_db = MockPaperDatabase.return_value
-        self.search_manager = SearchManager(project_dir='/fake/dir')
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.search_manager = SearchManager(project_dir=self.temp_dir.name)
 
-    def test_search_all(self):
+    def tearDown(self):
+        self.temp_dir.cleanup()
         self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv")]
         self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar")]
 
