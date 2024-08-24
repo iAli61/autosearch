@@ -14,7 +14,16 @@ class TestSearchManager(unittest.TestCase):
         self.mock_paper_db = MockPaperDatabase.return_value
         self.search_manager = SearchManager(project_dir='/fake/dir')
 
-    def test_get_paper_metadata(self):
+    def test_search_all(self):
+        self.mock_arxiv_api.search.return_value = [Paper(title="Arxiv Paper", url="http://arxiv.org/abs/1234", source="arxiv")]
+        self.mock_google_scholar_api.search.return_value = [Paper(title="Google Scholar Paper", url="http://scholar.google.com/abs/5678", source="google_scholar")]
+
+        results = self.search_manager.search_all("quantum computing", 5)
+
+        self.assertIn('arxiv', results)
+        self.assertIn('google_scholar', results)
+        self.assertEqual(len(results['arxiv']), 1)
+        self.assertEqual(len(results['google_scholar']), 1)
         paper_metadata = Paper(title="Test Paper", url="http://arxiv.org/abs/1234", source="arxiv")
         self.mock_arxiv_api.get_paper_metadata.return_value = paper_metadata
 
