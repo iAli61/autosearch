@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Directory containing the Markdown files
-input_dir="/home/alibina/repo/usecases/autosearch_projects/polymer_representation/polymer_representation/0.3/output/markdown"
-output_dir="/home/alibina/repo/usecases/ragtest/input"
+input_dir="../autosearch_projects/polymer_representation/polymer_representation/0.3/output/markdown"
+output_dir="../ragtest/input"
 
 # Create the output directory if it doesn't exist
 mkdir -p "$output_dir"
