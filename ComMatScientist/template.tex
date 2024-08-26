@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry} % Adjust the margin as needed
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float} % Add the float package
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% Custom command to scale images to text width
+\let\oldincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{%
+  \begin{figure}[H] % Use the H placement option
+    \centering
+    \oldincludegraphics[width=\textwidth]{#2}
+  \end{figure}
+}
+
+\begin{document}
+$if(title)$
+\title{$title$}
+\author{$author$}
+\date{$date$}
+\maketitle
+$endif$
+
+$body$
+
+\end{document}
