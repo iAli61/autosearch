@@ -40,3 +40,6 @@ autosearch_projects/polymer_representation/papers
 autosearch_projects/polymer_representation/polymer_representation/
 *logs.db-journal
 nb/output
+.aider*
+azure/gpt-4o
+ollama/deepseek-coder-v2

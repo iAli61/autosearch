@@ -1,0 +1,6 @@
+appmap_dir: tmp/appmap
+language: python
+name: autosearch
+packages:
+- path: autosearch
+record_test_cases: false
