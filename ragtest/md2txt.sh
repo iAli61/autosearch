@@ -6,15 +6,6 @@ if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
   exit 1
 fi
 
-# Directory containing the Markdown files
-input_dir="$1"
-
-# Set default output directory if not provided
-if [ "$#" -eq 2 ]; then
-  output_dir="$2"
-else
-  output_dir="./ragtest/input"
-fi
 
 
 # Create the output directory if it doesn't exist
