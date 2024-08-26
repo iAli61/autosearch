@@ -16,9 +16,6 @@ else
   output_dir="./ragtest/input"
 fi
 
-# Directory containing the Markdown files
-input_dir="$1"
-output_dir="$2"
 
 # Create the output directory if it doesn't exist
 mkdir -p "$output_dir"
