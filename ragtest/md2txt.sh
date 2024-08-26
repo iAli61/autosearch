@@ -1,8 +1,14 @@
 #!/bin/bash
 
+# Check if the correct number of arguments is provided
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <input_dir> <output_dir>"
+  exit 1
+fi
+
 # Directory containing the Markdown files
-input_dir="../autosearch_projects/polymer_representation/polymer_representation/0.3/output/markdown"
-output_dir="../ragtest/input"
+input_dir="$1"
+output_dir="$2"
 
 # Create the output directory if it doesn't exist
 mkdir -p "$output_dir"
