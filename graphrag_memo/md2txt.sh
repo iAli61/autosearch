@@ -7,6 +7,9 @@ if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
 fi
 
 
+# Assign input and output directories
+input_dir="$1"
+output_dir="$2"
 
 # Create the output directory if it doesn't exist
 mkdir -p "$output_dir"
@@ -14,7 +17,7 @@ mkdir -p "$output_dir"
 # Loop through all Markdown files in the input directory
 for md_file in "$input_dir"/*.md; do
   # Get the base name of the file (without the directory and extension)
-  # print the nemar of the file
+  # print the name of the file
   echo "$md_file"
   base_name=$(basename "$md_file" .md)
   
