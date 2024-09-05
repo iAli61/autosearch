@@ -13,7 +13,7 @@ import os
 
 
 class WriteBlog(ResearchProject):
-    def __init__(self, title, target_audience, instruction, *args, **kwargs):
+    def __init__(self, title, target_audience, instruction=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title = title
         self.target_audience = target_audience

@@ -26,7 +26,7 @@ def momorized_text(text: str, paper: Paper, project_config: ProjectConfig):
 def chunk_pdf(paper: Paper, project_config: ProjectConfig):
 
     paper_db = project_config.paper_db
-    doc_analyzer = project_config.doc_analyzer
+    doc_analyzer = project_config.doc_analyzer 
 
     chunked_elements = doc_analyzer.pdf2md_chunck(paper)
 
