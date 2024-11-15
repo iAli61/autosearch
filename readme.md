@@ -6,8 +6,6 @@ Autosearch is a sophisticated multi-agent system designed to automate and enhanc
 
 ## high-level architecture diagram
 
-![source code high-level architecture](./docs/high-level_architecture-package.png)
-
 ![high-level architecture](./docs/high-level_architecture.png)
 
 
@@ -322,6 +320,8 @@ project_test/
 **You could see the results [here](example-project/polymer_representation/polymer_representation/0.3/results)**
 
 # file structure of project
+
+![source code high-level architecture](./docs/high-level_architecture-package.png)
 
 ```
 autosearch/
