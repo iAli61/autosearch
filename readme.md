@@ -6,6 +6,8 @@ Autosearch is a sophisticated multi-agent system designed to automate and enhanc
 
 ## high-level architecture diagram
 
+![source code high-level architecture](./docs/high-level_architecture-package.png)
+
 ![high-level architecture](./docs/high-level_architecture.png)
 
 
