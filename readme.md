@@ -191,6 +191,8 @@ The project is designed to be both powerful and extensible, allowing researchers
 
 ## Detailed Explanation of Autosearch Usage Example
 
+**You could see the results [here](example-project/polymer_representation/polymer_representation/0.3/results)**
+
 ### 1. Project Initialization
 
 ```python
@@ -316,16 +318,10 @@ project_test/
 │   └── papers.db     # Paper database
 ```
 
-## Target Audience Considerations
 
-The specified target audience ("expert in experimental polymer science and machine learning experts") influences:
-- Technical depth of content
-- Terminology usage
-- Complexity of explanations
-- Type of examples and applications discussed
-- Level of mathematical and theoretical detail
+**You could see the results [here](example-project/polymer_representation/polymer_representation/0.3/results)**
 
-## file structure of project
+# file structure of project
 
 ```
 autosearch/
