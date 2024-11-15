@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000">
+  <!-- Main Container Background -->
+  <rect width="1400" height="1000" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="700" y="40" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50">Enhanced AutoSearch System Architecture</text>
+  
+  <!-- Core Infrastructure Layer -->
+  <rect x="50" y="80" width="1300" height="200" fill="#e8f4f8" rx="10"/>
+  <text x="70" y="110" font-size="18" font-weight="bold" fill="#2c3e50">Core Infrastructure Layer</text>
+  
+  <!-- Search APIs -->
+  <rect x="70" y="130" width="250" height="130" fill="#3498db" rx="10"/>
+  <text x="195" y="155" text-anchor="middle" fill="white" font-weight="bold">Search APIs</text>
+  <text x="195" y="180" text-anchor="middle" fill="white" font-size="12">ArxivAPI</text>
+  <text x="195" y="200" text-anchor="middle" fill="white" font-size="12">GoogleScholarAPI</text>
+  <text x="195" y="220" text-anchor="middle" fill="white" font-size="12">SearchManager</text>
+  
+  <!-- Document Analysis -->
+  <rect x="340" y="130" width="250" height="130" fill="#e74c3c" rx="10"/>
+  <text x="465" y="155" text-anchor="middle" fill="white" font-weight="bold">Document Analysis</text>
+  <text x="465" y="180" text-anchor="middle" fill="white" font-size="12">DocumentAnalyzer</text>
+  <text x="465" y="200" text-anchor="middle" fill="white" font-size="12">PDFManager</text>
+  <text x="465" y="220" text-anchor="middle" fill="white" font-size="12">MetadataExtractor</text>
+  
+  <!-- Storage -->
+  <rect x="610" y="130" width="250" height="130" fill="#2ecc71" rx="10"/>
+  <text x="735" y="155" text-anchor="middle" fill="white" font-weight="bold">Storage</text>
+  <text x="735" y="180" text-anchor="middle" fill="white" font-size="12">PaperDatabase</text>
+  <text x="735" y="200" text-anchor="middle" fill="white" font-size="12">MemoStore</text>
+  
+  <!-- Project Management -->
+  <rect x="880" y="130" width="450" height="130" fill="#95a5a6" rx="10"/>
+  <text x="1105" y="155" text-anchor="middle" fill="white" font-weight="bold">Project Management</text>
+  <text x="1105" y="180" text-anchor="middle" fill="white" font-size="12">ProjectConfig</text>
+  <text x="1105" y="200" text-anchor="middle" fill="white" font-size="12">ResearchProject</text>
+  <text x="1105" y="220" text-anchor="middle" fill="white" font-size="12">WriteBlog</text>
+  
+  <!-- Agent System Layer -->
+  <rect x="50" y="300" width="1300" height="400" fill="#f6e8ff" rx="10"/>
+  <text x="70" y="330" font-size="18" font-weight="bold" fill="#2c3e50">Agent System Layer</text>
+  
+  <!-- Research and Planning Agents -->
+  <rect x="70" y="350" width="300" height="330" fill="#9b59b6" rx="10" opacity="0.9"/>
+  <text x="220" y="380" text-anchor="middle" fill="white" font-weight="bold">Research & Planning Agents</text>
+  
+  <!-- Editor in Chief -->
+  <rect x="90" y="400" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="220" y="425" text-anchor="middle" font-size="12" font-weight="bold">Editor-in-Chief</text>
+  <text x="220" y="445" text-anchor="middle" font-size="10">Tools: academic_search, academic_retriever,</text>
+  <text x="220" y="460" text-anchor="middle" font-size="10">memorization_skill, get_pdf</text>
+  
+  <!-- Topic Expert -->
+  <rect x="90" y="490" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="220" y="515" text-anchor="middle" font-size="12" font-weight="bold">Topic Expert</text>
+  <text x="220" y="535" text-anchor="middle" font-size="10">Tools: academic_search,</text>
+  <text x="220" y="550" text-anchor="middle" font-size="10">academic_retriever</text>
+  
+  <!-- Structure Specialist -->
+  <rect x="90" y="580" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="220" y="605" text-anchor="middle" font-size="12" font-weight="bold">Structure Specialist</text>
+  <text x="220" y="625" text-anchor="middle" font-size="10">Tools: memorization_skill,</text>
+  <text x="220" y="640" text-anchor="middle" font-size="10">document_analyzer</text>
+  
+  <!-- Content Development Agents -->
+  <rect x="390" y="350" width="620" height="330" fill="#d35400" rx="10" opacity="0.9"/>
+  <text x="700" y="380" text-anchor="middle" fill="white" font-weight="bold">Content Development Agents</text>
+  
+  <!-- Development Team -->
+  <g transform="translate(410, 400)">
+    <!-- Content Strategist -->
+    <rect x="0" y="0" width="280" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+    <text x="140" y="25" text-anchor="middle" font-size="12" font-weight="bold">Content Strategist</text>
+    <text x="140" y="45" text-anchor="middle" font-size="10">Tools: factual_check, academic_retriever,</text>
+    <text x="140" y="60" text-anchor="middle" font-size="10">get_pdf</text>
+    
+    <!-- Writing Coordinator -->
+    <rect x="300" y="0" width="280" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+    <text x="440" y="25" text-anchor="middle" font-size="12" font-weight="bold">Writing Coordinator</text>
+    <text x="440" y="45" text-anchor="middle" font-size="10">Tools: write_section,</text>
+    <text x="440" y="60" text-anchor="middle" font-size="10">memorization_skill</text>
+    
+    <!-- Data Writer -->
+    <rect x="0" y="90" width="280" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+    <text x="140" y="115" text-anchor="middle" font-size="12" font-weight="bold">Data Writer</text>
+    <text x="140" y="135" text-anchor="middle" font-size="10">Tools: academic_search,</text>
+    <text x="140" y="150" text-anchor="middle" font-size="10">text_analysis</text>
+    
+    <!-- Review Specialist -->
+    <rect x="300" y="90" width="280" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+    <text x="440" y="115" text-anchor="middle" font-size="12" font-weight="bold">Review Specialist</text>
+    <text x="440" y="135" text-anchor="middle" font-size="10">Tools: factual_check,</text>
+    <text x="440" y="150" text-anchor="middle" font-size="10">url_check</text>
+    
+    <!-- Graphviz Expert -->
+    <rect x="150" y="180" width="280" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+    <text x="290" y="205" text-anchor="middle" font-size="12" font-weight="bold">Graphviz Expert</text>
+    <text x="290" y="225" text-anchor="middle" font-size="10">Tools: visualization_generation,</text>
+    <text x="290" y="240" text-anchor="middle" font-size="10">image_processing</text>
+  </g>
+  
+  <!-- Quality Control Agents -->
+  <rect x="1030" y="350" width="300" height="330" fill="#c0392b" rx="10" opacity="0.9"/>
+  <text x="1180" y="380" text-anchor="middle" fill="white" font-weight="bold">Quality Control Agents</text>
+  
+  <!-- QC Team -->
+  <rect x="1050" y="400" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="1180" y="425" text-anchor="middle" font-size="12" font-weight="bold">Coherence Coordinator</text>
+  <text x="1180" y="445" text-anchor="middle" font-size="10">Tools: text_analysis,</text>
+  <text x="1180" y="460" text-anchor="middle" font-size="10">memorization_skill</text>
+  
+  <rect x="1050" y="490" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="1180" y="515" text-anchor="middle" font-size="12" font-weight="bold">Factual Check</text>
+  <text x="1180" y="535" text-anchor="middle" font-size="10">Tools: academic_search,</text>
+  <text x="1180" y="550" text-anchor="middle" font-size="10">factual_check</text>
+  
+  <rect x="1050" y="580" width="260" height="80" fill="#ffffff" rx="5" opacity="0.9"/>
+  <text x="1180" y="605" text-anchor="middle" font-size="12" font-weight="bold">Content Validator</text>
+  <text x="1180" y="625" text-anchor="middle" font-size="10">Tools: document_analyzer,</text>
+  <text x="1180" y="640" text-anchor="middle" font-size="10">quality_assessment</text>
+  
+  <!-- Content Generation Layer -->
+  <rect x="50" y="720" width="1300" height="250" fill="#fff5e6" rx="10"/>
+  <text x="70" y="750" font-size="18" font-weight="bold" fill="#2c3e50">Content Generation Layer</text>
+  
+  <!-- Research Output -->
+  <rect x="70" y="770" width="300" height="180" fill="#f1c40f" rx="10"/>
+  <text x="220" y="800" text-anchor="middle" fill="black" font-weight="bold">Research Output</text>
+  <text x="220" y="830" text-anchor="middle" fill="black" font-size="12">Paper Summaries</text>
+  <text x="220" y="850" text-anchor="middle" fill="black" font-size="12">Research Analysis</text>
+  <text x="220" y="870" text-anchor="middle" fill="black" font-size="12">Literature Reviews</text>
+  
+  <!-- Blog Content -->
+  <rect x="390" y="770" width="300" height="180" fill="#f1c40f" rx="10"/>
+  <text x="540" y="800" text-anchor="middle" fill="black" font-weight="bold">Blog Content</text>
+  <text x="540" y="830" text-anchor="middle" fill="black" font-size="12">Article Sections</text>
+  <text x="540" y="850" text-anchor="middle" fill="black" font-size="12">Visualizations</text>
+  <text x="540" y="870" text-anchor="middle" fill="black" font-size="12">Technical Content</text>
+  
+  <!-- Quality Metrics -->
+  <rect x="710" y="770" width="300" height="180" fill="#f1c40f" rx="10"/>
+  <text x="860" y="800" text-anchor="middle" fill="black" font-weight="bold">Quality Metrics</text>
+  <text x="860" y="830" text-anchor="middle" fill="black" font-size="12">Accuracy Scores</text>
+  <text x="860" y="850" text-anchor="middle" fill="black" font-size="12">Coherence Metrics</text>
+  <text x="860" y="870" text-anchor="middle" fill="black" font-size="12">Content Quality Assessment</text>
+  
+  <!-- Documentation -->
+  <rect x="1030" y="770" width="300" height="180" fill="#f1c40f" rx="10"/>
+  <text x="1180" y="800" text-anchor="middle" fill="black" font-weight="bold">Documentation</text>
+  <text x="1180" y="830" text-anchor="middle" fill="black" font-size="12">Research Logs</text>
+  <text x="1180" y="850" text-anchor="middle" fill="black" font-size="12">Process Documentation</text>
+  <text x="1180" y="870" text-anchor="middle" fill="black" font-size="12">Version History</text>
+
+  <!-- Interaction Lines -->
+  <g stroke="#34495e" stroke-width="1.5" fill="none">
+    <!-- Infrastructure to Agent Layer -->
+    <path d="M195,260 L195,350" stroke-dasharray="4"/>
+    <path d="M465,260 L465,350" stroke-dasharray="4"/>
+    <path d="M735,260 L735,350" stroke-dasharray="4"/>
+    <path d="M1105,260 L1105,350" stroke-dasharray="4"/>
+    
+    <!-- Agent Layer to Content Generation -->
+    <path d="M220,680 L220,770" stroke-dasharray="4"/>
+    <path d="M540,680 L540,770" stroke-dasharray="4"/>
+    <path d="M860,680 L860,770" stroke-dasharray="4"/>
+    <path d="M1180,680 L1180,770" stroke-dasharray="4"/>
+  </g>
+</svg>
