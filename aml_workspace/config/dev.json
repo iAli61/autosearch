@@ -1,0 +1,46 @@
+{
+    "subscription_id": "",
+    "resource_group": "rg-airesearcher-dev-01",
+    "workspace_name": "mlw-airesearcher-dev-01",
+    "location": "swedencentral",
+    "tags": {
+        "environment": "development",
+        "project": "audio-anomaly-detection",
+        "department": "data-science"
+    },
+    "compute": {
+        "cpu_cluster": {
+            "name": "cpu-cluster",
+            "vm_size": "STANDARD_D13_V2",
+            "min_instances": 0,
+            "max_instances": 4,
+            "idle_time_before_scale_down": 120,
+            "low_priority": true
+        },
+        "gpu_cluster": {
+            "name": "gpu-cluster",
+            "vm_size": "Standard_NC6s_v3",
+            "min_instances": 0,
+            "max_instances": 2,
+            "idle_time_before_scale_down": 120,
+            "low_priority": true
+        },
+        "compute_instances": [
+            {
+                "name": "ci-cpu-01",
+                "vm_size": "STANDARD_DS3_V2"
+            },
+            {
+                "name": "ci-gpu-a100_24core",
+                "vm_size": "Standard_NC24ads_A100_v4"
+            },
+            {
+                "name": "ci-gpu-t4",
+                "vm_size": "Standard_NC4as_T4_v3"
+            }
+        ]
+    },
+    "identity": {
+        "name": "mlw-airesearcher-dev-01"           
+    }
+}
