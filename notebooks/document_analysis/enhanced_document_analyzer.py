@@ -106,12 +106,13 @@ class EnhancedDocumentAnalyzer:
                 ))
         return elements
 
+
     def _process_layout_elements(self,
-                               elements: List[DocumentElement],
-                               page_img: Image.Image,
-                               pdf_name: str,
-                               page_num: int) -> List[DocumentElementRecord]:
-        """Process elements detected by LayoutDetectionService."""
+                                elements: List[DocumentElement],
+                                page_img: Image.Image,
+                                pdf_name: str,
+                                page_num: int) -> List[DocumentElementRecord]:
+        """Process elements detected by LayoutDetectionService with Nougat text extraction."""
         records = []
         
         for elem in elements:
@@ -119,34 +120,88 @@ class EnhancedDocumentAnalyzer:
             if elem.label.lower() == 'text':
                 continue
                 
-            # Determine element type
+            # Determine element type and extraction method
+            extraction_method = 'default'
             if elem.label.lower() in ['figure', 'image']:
                 elem_type = DocumentElementType.IMAGE
             elif elem.label.lower() == 'table':
                 elem_type = DocumentElementType.TABLE
+                extraction_method = 'nougat'
             elif elem.label.lower() == 'formula':
                 elem_type = DocumentElementType.FORMULA
+                extraction_method = 'nougat'
             elif elem.label.lower() == 'caption':
-                # Try to determine caption type based on position
                 elem_type = self._determine_caption_type(elem, elements)
+                extraction_method = 'nougat'
             else:
                 continue
                 
             # Save element image
             img_path = self._save_element_image(page_img, elem, page_num)
             
-            # Create record
+            # Extract text using appropriate method
+            extracted_text = None
+            if extraction_method == 'nougat':
+                try:
+                    # Load and preprocess the element image
+                    element_img = Image.open(img_path).convert('RGB')
+                    
+                    # Try multiple extraction attempts with error handling
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        try:
+                            # Process with Nougat
+                            extracted_text = self.nougat_service.get_text_from_nougat(img_path)
+                            if extracted_text:
+                                break
+                        except AttributeError as ae:
+                            # Handle specific model attribute errors
+                            if 'pos_drop' in str(ae):
+                                # Log warning but continue processing
+                                print(f"Warning: Known model attribute issue encountered (attempt {attempt + 1}/{max_attempts})")
+                                continue
+                            else:
+                                raise ae
+                        except Exception as e:
+                            if attempt < max_attempts - 1:
+                                print(f"Extraction attempt {attempt + 1} failed, retrying...")
+                                continue
+                            else:
+                                print(f"Error extracting text with Nougat for {elem.label} on page {page_num}: {str(e)}")
+                                break
+                    
+                    if not extracted_text:
+                        # If Nougat extraction failed, try OCR fallback for tables
+                        if elem_type == DocumentElementType.TABLE:
+                            try:
+                                import pytesseract
+                                extracted_text = pytesseract.image_to_string(element_img)
+                            except Exception as e:
+                                print(f"OCR fallback failed for table on page {page_num}: {str(e)}")
+                        else:
+                            print(f"Warning: No text extracted from {elem.label} on page {page_num}")
+                            
+                except Exception as e:
+                    print(f"Error processing {elem.label} image on page {page_num}: {str(e)}")
+            
+            # Create record with extracted or original text
             records.append(DocumentElementRecord(
                 pdf_file=pdf_name,
                 page=page_num,
                 bounding_box=BoundingBox.from_layout_box(page_num, elem.box),
                 element_type=elem_type,
-                text=elem.text if elem.text else None,
+                text=extracted_text if extracted_text else elem.text,
                 image_path=img_path,
-                confidence=elem.confidence
+                confidence=elem.confidence,
+                metadata={
+                    'extraction_method': extraction_method,
+                    'extraction_success': bool(extracted_text)
+                }
             ))
             
         return records
+
+
 
     def _determine_caption_type(self, 
                               caption_elem: DocumentElement,
