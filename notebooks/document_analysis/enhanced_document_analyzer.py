@@ -18,7 +18,9 @@ class EnhancedDocumentAnalyzer:
                  api_key: str, 
                  endpoint: str, 
                  output_dir: str = "output",
-                 confidence_threshold: float = 0.7):
+                 confidence_threshold: float = 0.7,
+                 min_length: int = 10,
+                 ignor_roles: List[str] = ['pageFooter','footnote']):
         """Initialize the document analyzer with both Azure and local services."""
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -31,6 +33,9 @@ class EnhancedDocumentAnalyzer:
         
         # Initialize Nougat service for complex elements
         self.nougat_service = NougatService()
+        
+        self.min_length = min_length
+        self.ignor_roles = ignor_roles
 
     def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame]:
         """
@@ -94,6 +99,10 @@ class EnhancedDocumentAnalyzer:
         """Process text paragraphs from Azure Document Intelligence."""
         elements = []
         for para in paragraphs:
+            if para['role'] in self.ignor_roles:
+                continue
+            if len(para['content']) < self.min_length:
+                continue
             if para['bounding_regions'][0]['page_number'] == page_num:
                 elements.append(DocumentElementRecord(
                     pdf_file=pdf_name,
@@ -102,7 +111,10 @@ class EnhancedDocumentAnalyzer:
                     element_type=DocumentElementType.TEXT,
                     text=para['content'],
                     role=para['role'],
-                    spans=para['spans']
+                    spans=para['spans'],
+                    metadata={
+                        'source': 'azure_document_intelligence'
+                    }
                 ))
         return elements
 
@@ -156,7 +168,8 @@ class EnhancedDocumentAnalyzer:
                 confidence=elem.confidence,
                 metadata={
                     'extraction_method': extraction_method,
-                    'extraction_success': bool(extracted_text)
+                    'extraction_success': bool(extracted_text),
+                    'source': 'layout_detector'
                 }
             ))
             
@@ -314,7 +327,8 @@ class EnhancedDocumentAnalyzer:
                 'image_path': elem.image_path,
                 'role': elem.role,
                 'confidence': elem.confidence,
-                'spans': str(elem.spans) if elem.spans else None
+                'spans': str(elem.spans) if elem.spans else None,
+                'source': elem.metadata.get('source') if elem.metadata else None
             }
             records.append(record)
             

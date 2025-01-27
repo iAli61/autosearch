@@ -1,0 +1,169 @@
+# EnhancedDocumentAnalyzer
+
+A sophisticated document analysis system that combines Azure Document Intelligence with advanced layout analysis and AI-powered text extraction to process academic papers and technical documents.
+
+## Architecture Overview
+
+The system is organized into four main processing layers, each handling specific aspects of document analysis:
+
+### 1. Image Processing Layer
+
+This layer handles the initial document processing and conversion:
+
+- **PDF to Image Converter**
+  - Converts PDF pages to high-resolution images (216 DPI)
+  - Uses PyMuPDF for accurate rendering
+  - Optimizes images for OCR processing
+
+- **Layout Detection Service**
+  - Uses Deformable DETR model for element detection
+  - Identifies text blocks, titles, figures, tables, and captions
+  - Generates bounding boxes for each element
+
+- **Nougat OCR Service**
+  - Specializes in academic and technical document OCR
+  - Handles mathematical equations and special characters
+  - Preserves document formatting and structure
+
+### 2. Analysis Layer
+
+This layer performs deep analysis of document structure and content:
+
+- **Azure Document Intelligence**
+  - Extracts text with high accuracy
+  - Identifies document hierarchy and relationships
+  - Provides confidence scores for extracted elements
+
+- **Layout Analyzer**
+  - Detects column structures using histogram analysis
+  - Calculates precise column boundaries and spacing
+  - Determines reading order of elements
+
+### 3. Processing Layer
+
+This layer handles element relationships and metadata:
+
+- **Column Analysis**
+  - Calculates column offsets and margins
+  - Determines column relationships
+  - Handles complex multi-column layouts
+
+- **Element Mapping**
+  - Creates relationships between document elements
+  - Maintains spatial and logical hierarchies
+  - Tracks element ordering and grouping
+
+- **Caption-Image Matching**
+  - Associates captions with corresponding images
+  - Uses spatial proximity algorithms
+  - Handles complex page layouts
+
+- **Style Extraction**
+  - Preserves font information and formatting
+  - Extracts visual style attributes
+  - Maintains document styling hierarchy
+
+### 4. Output Generation Layer
+
+This layer produces structured outputs:
+
+- **DataFrame Generator**
+  - Creates structured data representation
+  - Includes spatial and relational information
+  - Provides quantitative analysis capabilities
+
+- **Markdown Service**
+  - Generates human-readable documentation
+  - Preserves document structure
+  - Includes embedded visualizations
+
+## Key Features
+
+1. **Intelligent Layout Analysis**
+   - Multi-column detection
+   - Precise boundary calculation
+   - Spatial relationship mapping
+
+2. **Advanced Text Processing**
+   - Technical content extraction
+   - Mathematical formula handling
+   - Multi-language support
+
+3. **Smart Element Association**
+   - Caption-figure matching
+   - Reference linking
+   - Cross-reference detection
+
+4. **Rich Output Formats**
+   - Structured DataFrame
+   - Markdown documentation
+   - Visual element mapping
+
+## Usage
+
+```python
+analyzer = EnhancedDocumentAnalyzer(
+    api_key="your_azure_key",
+    endpoint="your_azure_endpoint",
+    output_dir="output",
+    confidence_threshold=0.7
+)
+
+# Process document
+markdown_text, elements_df = analyzer.analyze_document("path/to/document.pdf")
+
+# Save results
+elements_df.to_csv("elements.csv")
+with open("analysis.md", "w") as f:
+    f.write(markdown_text)
+```
+
+## DataFrame Structure
+
+The output DataFrame includes the following columns:
+
+- `page`: Page number
+- `label`: Element type
+- `confidence`: Detection confidence score
+- `text`: Extracted text content
+- `box_x1`, `box_y1`, `box_x2`, `box_y2`: Bounding box coordinates
+- `column`: Column number
+- `column_offset`: Distance from column start
+- `column_spacing`: Space between columns
+- `reading_order`: Element order in document
+- `path`: Path to element image
+- `has_caption`: Caption association flag
+- `has_image`: Image association flag
+
+## Markdown Output
+
+The generated markdown includes:
+
+1. Document metadata
+2. Structural analysis
+3. Content hierarchy
+4. Element relationships
+5. Embedded visualizations
+
+## Performance Considerations
+
+- High-resolution image processing may require significant memory
+- Multi-threaded processing for large documents
+- GPU acceleration for layout detection when available
+- Batch processing for multiple documents
+
+## Dependencies
+
+- PyMuPDF for PDF processing
+- Azure Document Intelligence SDK
+- Nougat for technical OCR
+- Transformers for layout detection
+- Pandas for data structuring
+
+## Future Enhancements
+
+1. Table structure analysis
+2. Reference extraction and linking
+3. Enhanced mathematical formula processing
+4. Multi-document correlation
+5. Interactive visualization options
