@@ -11,6 +11,8 @@ class DocumentElement:
     page: int              # Page number
     text: str = ""         # Extracted text content
     path: str = ""         # Path to saved image of element
+    column: int = 0        # Column number (0 for single column)
+    reading_order: int = 0  # Position in reading order
 
 @dataclass
 class PageResult:

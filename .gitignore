@@ -66,3 +66,4 @@ tests/test_project_dir
 notebooks/analysis_results/*
 notebooks/output/*
 notebooks/nougat/*
+notebooks/output*
