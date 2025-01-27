@@ -140,49 +140,10 @@ class EnhancedDocumentAnalyzer:
             img_path = self._save_element_image(page_img, elem, page_num)
             
             # Extract text using appropriate method
-            extracted_text = None
-            if extraction_method == 'nougat':
-                try:
-                    # Load and preprocess the element image
-                    element_img = Image.open(img_path).convert('RGB')
-                    
-                    # Try multiple extraction attempts with error handling
-                    max_attempts = 3
-                    for attempt in range(max_attempts):
-                        try:
-                            # Process with Nougat
-                            extracted_text = self.nougat_service.get_text_from_nougat(img_path)
-                            if extracted_text:
-                                break
-                        except AttributeError as ae:
-                            # Handle specific model attribute errors
-                            if 'pos_drop' in str(ae):
-                                # Log warning but continue processing
-                                print(f"Warning: Known model attribute issue encountered (attempt {attempt + 1}/{max_attempts})")
-                                continue
-                            else:
-                                raise ae
-                        except Exception as e:
-                            if attempt < max_attempts - 1:
-                                print(f"Extraction attempt {attempt + 1} failed, retrying...")
-                                continue
-                            else:
-                                print(f"Error extracting text with Nougat for {elem.label} on page {page_num}: {str(e)}")
-                                break
-                    
-                    if not extracted_text:
-                        # If Nougat extraction failed, try OCR fallback for tables
-                        if elem_type == DocumentElementType.TABLE:
-                            try:
-                                import pytesseract
-                                extracted_text = pytesseract.image_to_string(element_img)
-                            except Exception as e:
-                                print(f"OCR fallback failed for table on page {page_num}: {str(e)}")
-                        else:
-                            print(f"Warning: No text extracted from {elem.label} on page {page_num}")
-                            
-                except Exception as e:
-                    print(f"Error processing {elem.label} image on page {page_num}: {str(e)}")
+            if extraction_method == 'nougat' and elem_type != DocumentElementType.IMAGE:
+                extracted_text = self._extract_text_with_nougat(elem, page_num, img_path, elem_type)
+            else:
+                extracted_text = None
             
             # Create record with extracted or original text
             records.append(DocumentElementRecord(
@@ -201,7 +162,48 @@ class EnhancedDocumentAnalyzer:
             
         return records
 
-
+    def _extract_text_with_nougat(self, elem, page_num, img_path, elem_type):
+        extracted_text = None
+        try:
+            # Try multiple extraction attempts with error handling
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    # Process with Nougat
+                    extracted_text = self.nougat_service.get_text_from_nougat(img_path)
+                    if extracted_text:
+                        break
+                except AttributeError as ae:
+                    # Handle specific model attribute errors
+                    if 'pos_drop' in str(ae):
+                        print(f"Warning: Known model attribute issue encountered (attempt {attempt + 1}/{max_attempts})")
+                        continue
+                    else:
+                        raise ae
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        print(f"Extraction attempt {attempt + 1} failed, retrying...")
+                        continue
+                    else:
+                        print(f"Error extracting text with Nougat for {elem.label} on page {page_num}: {str(e)}")
+                        break
+            
+            if not extracted_text:
+                # If Nougat extraction failed, try OCR fallback for tables
+                if elem_type == DocumentElementType.TABLE:
+                    try:
+                        import pytesseract
+                        from PIL import Image
+                        element_img = Image.open(img_path).convert('RGB')
+                        extracted_text = pytesseract.image_to_string(element_img)
+                    except Exception as e:
+                        print(f"OCR fallback failed for table on page {page_num}: {str(e)}")
+                else:
+                    print(f"Warning: No text extracted from {elem.label} on page {page_num}")
+        except Exception as e:
+            print(f"Error processing {elem.label} image on page {page_num}: {str(e)}")
+        
+        return extracted_text
 
     def _determine_caption_type(self, 
                               caption_elem: DocumentElement,
@@ -317,5 +319,4 @@ class EnhancedDocumentAnalyzer:
             records.append(record)
             
         return pd.DataFrame(records)
-    
-    
+
