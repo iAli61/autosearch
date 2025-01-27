@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 @dataclass
@@ -13,6 +13,7 @@ class DocumentElement:
     path: str = ""         # Path to saved image of element
     column: int = 0        # Column number (0 for single column)
     reading_order: int = 0  # Position in reading order
+    associated_caption: Optional[str] = None  # Caption associated with the element
 
 @dataclass
 class PageResult:

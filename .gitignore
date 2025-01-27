@@ -68,3 +68,4 @@ notebooks/output/*
 notebooks/nougat/*
 notebooks/output*
 all_files
+notebooks/nougat_checkpoint
