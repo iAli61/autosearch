@@ -63,3 +63,6 @@ autosearch_projects/polymer_degradability/paper/paper
 .azDownload-*
 *.parquet
 tests/test_project_dir
+notebooks/analysis_results/*
+notebooks/output/*
+notebooks/nougat/*
