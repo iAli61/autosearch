@@ -5,21 +5,29 @@ from .document_types import DocumentResult, DocumentElement
 class MarkdownService:
     """Service for generating markdown output from document analysis results."""
 
+    def format_results(self, result: DocumentResult) -> str:
+        """Format analysis results as markdown text."""
+        md = []
+        
+        # Add metadata section
+        md.extend(self._format_metadata(result))
+        
+        # Add document structure section
+        md.extend(self._format_pages(result))
+        
+        return "\n".join(md)
+
     def save_results(self, result: DocumentResult, document_name: str):
-        """Save analysis results in markdown format."""
+        """Save analysis results to a markdown file."""
         output_path = result.output_dir / f"{document_name}_analysis.md"
+        markdown_text = self.format_results(result)
         
         with output_path.open('w', encoding='utf-8') as f:
-            # Write metadata
-            f.write(self._format_metadata(result))
-            
-            # Write detected elements by page
-            f.write(self._format_pages(result))
+            f.write(markdown_text)
 
-    def _format_metadata(self, result: DocumentResult) -> str:
+    def _format_metadata(self, result: DocumentResult) -> List[str]:
         """Format document metadata section."""
-        md = "# Document Analysis Results\n\n"
-        md += "## Metadata\n"
+        md = ["# Document Analysis Results\n", "## Metadata\n"]
         
         metadata_dict = {
             "Title": result.metadata.title,
@@ -34,16 +42,17 @@ class MarkdownService:
         
         for key, value in metadata_dict.items():
             if value:  # Only include non-empty values
-                md += f"- **{key}:** {value}\n"
+                md.append(f"- **{key}:** {value}")
         
-        md += "\n"
+        md.append("\n")  # Add blank line after metadata
         return md
 
-    def _format_pages(self, result: DocumentResult) -> str:
-        md = "## Document Structure\n\n"
+    def _format_pages(self, result: DocumentResult) -> List[str]:
+        """Format document structure section."""
+        md = ["## Document Structure\n"]
         
         for page in result.pages:
-            md += f"### Page {page.page_number}\n\n"
+            md.append(f"### Page {page.page_number}\n")
             
             # Sort elements by reading order
             sorted_elements = sorted(page.elements, key=lambda x: x.reading_order)
@@ -54,22 +63,37 @@ class MarkdownService:
                 if element.column != current_column:
                     current_column = element.column
                     if len([e for e in page.elements if e.column > 0]) > 0:  # If multi-column
-                        md += f"\n#### Column {current_column + 1}\n\n"
+                        md.append(f"\n#### Column {current_column + 1}\n")
                 
-                # Add element content
-                if element.text:
-                    if element.label == "Title":
-                        md += f"## {element.text}\n\n"
-                    elif element.label == "Heading":
-                        md += f"### {element.text}\n\n"
-                    else:
-                        md += f"{element.text}\n\n"
-                
-                # Add images if present
-                if element.path:
-                    rel_path = Path(element.path).relative_to(result.output_dir)
-                    md += f"\n![{element.label}]({rel_path})\n\n"
+                # Format element content
+                md.extend(self._format_element(element, result))
             
-            md += "\n---\n\n"  # Page separator
+            md.append("\n---\n")  # Page separator
+        
+        return md
+
+    def _format_element(self, element: DocumentElement, result: DocumentResult) -> List[str]:
+        """Format a single document element."""
+        md = []
+        
+        # Handle text content
+        if element.text:
+            if element.label == "Title":
+                md.append(f"## {element.text}\n")
+            elif element.label == "Heading":
+                md.append(f"### {element.text}\n")
+            else:
+                md.append(f"{element.text}\n")
+        
+        # Handle images and captions
+        if element.path:
+            rel_path = Path(element.path).relative_to(result.output_dir)
+            caption_text = ""
+            
+            # Add caption if available
+            if element.associated_caption:
+                caption_text = f" - {element.associated_caption.text}"
+            
+            md.append(f"\n![{element.label}{caption_text}]({rel_path})\n")
         
         return md
