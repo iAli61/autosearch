@@ -13,36 +13,20 @@ from .document_types import (
 from .layout_detection_service import LayoutDetectionService
 from .nougat_service import NougatService
 from .markdown_service import MarkdownService
+from .layout_analyzer import LayoutAnalyzer
 
 class DocumentAnalyzer:
-    """Orchestrator for document analysis pipeline."""
-    
     def __init__(self, output_dir: str = "output", confidence_threshold: float = 0.7):
-        """
-        Initialize the document analyzer.
-        
-        Args:
-            output_dir: Directory for output files
-            confidence_threshold: Minimum confidence for element detection
-        """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize services
         self.layout_detector = LayoutDetectionService(confidence_threshold)
+        self.layout_analyzer = LayoutAnalyzer()
         self.nougat_service = NougatService()
         self.markdown_service = MarkdownService()
-        
+
     def analyze_document(self, pdf_path: str) -> DocumentResult:
-        """
-        Process a PDF document through the complete analysis pipeline.
-        
-        Args:
-            pdf_path: Path to the input PDF file
-            
-        Returns:
-            DocumentResult containing analysis results
-        """
         pdf_path = Path(pdf_path)
         print(f"Processing document: {pdf_path}")
         
@@ -61,7 +45,20 @@ class DocumentAnalyzer:
             # Detect layout elements
             elements = self.layout_detector.detect_elements(page_img, page_num)
             
-            # Save images of elements
+            # Analyze page layout and determine reading order
+            elements = self.layout_analyzer.detect_columns(elements, page_img.width)
+            elements = self.layout_analyzer.determine_reading_order(elements)
+            
+            # Save visualization of the page with bounding boxes
+            vis_path = self.layout_detector.save_page_with_boxes(
+                page_img,
+                elements,
+                self.output_dir,
+                page_num
+            )
+            print(f"Saved page visualization to: {vis_path}")
+            
+            # Save individual element images
             elements = self.layout_detector.save_elements_as_images(
                 page_img, 
                 elements, 
@@ -70,6 +67,9 @@ class DocumentAnalyzer:
             
             # Process text in detected elements
             elements = self.nougat_service.process_elements(elements)
+            
+            # Sort elements by reading order
+            elements = sorted(elements, key=lambda x: x.reading_order)
             
             # Add processed page to results
             pages.append(PageResult(page_number=page_num, elements=elements))
@@ -85,7 +85,6 @@ class DocumentAnalyzer:
         self.markdown_service.save_results(result, pdf_path.stem)
         
         return result
-
     def _pdf_to_images(self, pdf_path: Path) -> List[Image.Image]:
         """
         Convert PDF pages to images optimized for processing.

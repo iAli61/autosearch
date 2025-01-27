@@ -1,10 +1,10 @@
 from transformers import AutoImageProcessor, DeformableDetrForObjectDetection
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from typing import List
 from pathlib import Path
 import os
-
+import random
 from .document_types import DocumentElement
 
 class LayoutDetectionService:
@@ -28,6 +28,84 @@ class LayoutDetectionService:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         print(f"Layout detection service initialized. Using device: {self.device}")
+
+        # Define colors for different element types
+        self.colors = {
+            'Text': (255, 0, 0),      # Red
+            'Title': (0, 255, 0),     # Green
+            'List': (0, 0, 255),      # Blue
+            'Table': (255, 165, 0),   # Orange
+            'Figure': (128, 0, 128),  # Purple
+            'Caption': (0, 255, 255), # Cyan
+            'Header': (255, 192, 203), # Pink
+            'Footer': (255, 255, 0),  # Yellow
+            'Page_number': (165, 42, 42), # Brown
+            'Reference': (0, 128, 0)  # Dark Green
+        }
+
+    def save_page_with_boxes(self, 
+                            image: Image.Image, 
+                            elements: List[DocumentElement], 
+                            output_path: str,
+                            page_num: int) -> str:
+        """
+        Save the page image with bounding boxes drawn around detected elements.
+        
+        Args:
+            image: Original page image
+            elements: List of detected elements
+            output_path: Base directory for output
+            page_num: Current page number
+            
+        Returns:
+            str: Path to the saved visualization
+        """
+        # Create a copy of the image to draw on
+        vis_image = image.copy()
+        draw = ImageDraw.Draw(vis_image)
+        
+        # Try to load a font (use default if not available)
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        except:
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
+            except:
+                font = ImageFont.load_default()
+
+        # Draw boxes and labels for each element
+        for idx, element in enumerate(elements):
+            # Get color for this element type
+            color = self.colors.get(element.label, (random.randint(0, 255), 
+                                                  random.randint(0, 255), 
+                                                  random.randint(0, 255)))
+            
+            # Draw bounding box
+            box = element.box
+            draw.rectangle(
+                [(box[0], box[1]), (box[2], box[3])],
+                outline=color,
+                width=2
+            )
+            
+            # Draw label with confidence score
+            label_text = f"{element.label}: {element.confidence:.2f}"
+            text_bbox = draw.textbbox((box[0], box[1]-25), label_text, font=font)
+            draw.rectangle(text_bbox, fill=color)
+            draw.text(
+                (box[0], box[1]-25),
+                label_text,
+                fill='white',
+                font=font
+            )
+
+        # Save the visualization
+        vis_dir = Path(output_path) / 'visualizations'
+        vis_dir.mkdir(parents=True, exist_ok=True)
+        output_file = vis_dir / f'page_{page_num}_layout.png'
+        vis_image.save(output_file)
+        
+        return str(output_file)
 
     def detect_elements(self, image: Image.Image, page_num: int) -> List[DocumentElement]:
         """
