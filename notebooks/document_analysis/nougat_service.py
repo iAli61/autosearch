@@ -11,14 +11,19 @@ from .document_types import DocumentElement
 class NougatService:
     """Service for extracting text from document images using Nougat."""
     
-    def __init__(self):
+    def __init__(self, checkpoint: str = None):
         """Initialize the Nougat service."""
         print("Initializing Nougat model...")
-        checkpoint = get_checkpoint()
+        if checkpoint is None:
+            checkpoint = get_checkpoint()
         if checkpoint is None:
             raise ValueError("Set NOUGAT_CHECKPOINT environment variable!")
             
-        self.model = NougatModel.from_pretrained(checkpoint)
+        # Add ignore_mismatched_sizes=True to handle size mismatches
+        self.model = NougatModel.from_pretrained(
+            checkpoint,
+            ignore_mismatched_sizes=True  # Add this parameter
+        )
         
         # Move model to appropriate device
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -41,7 +46,7 @@ class NougatService:
             Elements with extracted text
         """
         # Process only text-based elements
-        text_elements = ['Text', 'Title', 'Caption', 'List']
+        text_elements = ['Text', 'Title', 'Caption', 'List', 'Formula']
         
         for element in elements:
             if element.label in text_elements and element.path and os.path.exists(element.path):
@@ -50,40 +55,52 @@ class NougatService:
                     image = Image.open(element.path).convert('RGB')
                     
                     # Prepare input
-                    image_tensor = self.model.encoder.prepare_input(image)
-                    if isinstance(image_tensor, tuple):
-                        image_tensor = image_tensor[0]
-                    image_tensor = image_tensor.unsqueeze(0).to(self.device)
+                    inputs = self.model.encoder.prepare_input(image).to(self.device)
+                    inputs = inputs.unsqueeze(0)
                     
                     # Run inference
                     with torch.no_grad():
                         try:
-                            output = self.model.inference(image_tensors=image_tensor)
+                            output = self.model.inference(image_tensors=inputs)
                             
                             prediction = output["predictions"][0]
-                            repeats = output.get("repeats", [None])[0]
+                            if prediction:
+                                element.text = markdown_compatible(prediction)
                             
-                            if repeats is not None:
-                                if repeats > 0:
-                                    disclaimer = "\n\n+++ ==WARNING: Truncated because of repetitions==\n%s\n+++\n\n"
-                                else:
-                                    disclaimer = "\n\n+++ ==ERROR: No output for this element==\n%s\n+++\n\n"
-                                
-                                rest = close_envs(output.get("repetitions", [""])[0]).strip()
-                                if rest:
-                                    disclaimer = disclaimer % rest
-                                else:
-                                    disclaimer = ""
-                                
-                                prediction += disclaimer
-                            
-                            element.text = markdown_compatible(prediction)
                         except Exception as e:
-                            print(f"Nougat inference error: {e}")
-                            element.text = f"Error during inference: {str(e)}"
+                            print(f"Nougat inference error for {element.label}: {e}")
+                            element.text = None
                     
                 except Exception as e:
                     print(f"Error processing {element.label}: {str(e)}")
-                    element.text = f"Processing error: {str(e)}"
+                    element.text = None
         
         return elements
+
+    def extract_text(self, image: Image.Image) -> str:
+        """
+        Extract text from a single image.
+        
+        Args:
+            image: PIL Image to process
+            
+        Returns:
+            str: Extracted text in markdown format
+        """
+        try:
+            # Prepare input
+            inputs = self.model.encoder.prepare_input(image).to(self.device)
+            inputs = inputs.unsqueeze(0)
+            
+            # Run inference
+            with torch.no_grad():
+                output = self.model.inference(image_tensors=inputs)
+                prediction = output["predictions"][0]
+                
+                if prediction:
+                    return markdown_compatible(prediction)
+                return ""
+                
+        except Exception as e:
+            print(f"Error extracting text: {str(e)}")
+            return ""

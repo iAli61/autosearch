@@ -9,6 +9,9 @@ from .layout_detection_service import LayoutDetectionService
 from .nougat_service import NougatService
 from .markdown_service import MarkdownService
 from .layout_analyzer import LayoutAnalyzer
+from .document_element_type import DocumentElementType
+from .enhanced_document_analyzer import EnhancedDocumentAnalyzer
+from .document_element_record import DocumentElementRecord, BoundingBox
 
 __all__ = [
     'DocumentAnalyzer',
@@ -19,5 +22,9 @@ __all__ = [
     'DocumentElement',
     'PageResult',
     'DocumentMetadata',
-    'DocumentResult'
+    'DocumentResult',
+    'DocumentElementType',
+    'EnhancedDocumentAnalyzer',
+    'DocumentElementRecord',
+    'BoundingBox'
 ]

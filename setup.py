@@ -21,7 +21,7 @@ setup(
         "langchain",
         # Add other dependencies here
     ],
-    python_requires=">=3.11",
+    python_requires=">=3.9",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
