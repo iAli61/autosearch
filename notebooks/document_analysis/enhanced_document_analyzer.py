@@ -208,8 +208,21 @@ class EnhancedDocumentAnalyzer:
                               row['source'] == 'azure_document_intelligence'):
                             filtered_elements.append(elem)
                             break
+                            
+        # Debug information
+        print(f"Total rows in DataFrame: {len(df)}")
+        print(f"Total filtered elements: {len(filtered_elements)}")
+        print(f"Original elements: {len(elements)}")
         
         markdown_text = self._create_markdown(filtered_elements)
+        
+        # Debug markdown
+        if not markdown_text.strip():
+            print("Warning: Generated markdown is empty")
+            print("First few filtered elements:")
+            for elem in filtered_elements[:5]:
+                print(f"Type: {elem.element_type}, Text: {elem.text[:100] if elem.text else 'None'}")
+                
         
         # Create visualizations
         visualizer = BoundingBoxVisualizer()
