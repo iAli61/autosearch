@@ -122,11 +122,14 @@ class EnhancedDocumentAnalyzer:
         """
         Analyze a PDF document and create visualizations.
         
+        Args:
+            pdf_path: Path to the PDF file to analyze
+            
         Returns:
-            Tuple[str, pd.DataFrame, Dict[int, str]]: 
-                - Markdown text
-                - Elements dataframe
-                - Dictionary mapping page numbers to visualization paths
+            Tuple containing:
+            - Markdown text representation of the document
+            - DataFrame with element information
+            - Dictionary mapping page numbers to visualization paths
         """
         pdf_path = Path(pdf_path)
         elements = []
@@ -170,12 +173,14 @@ class EnhancedDocumentAnalyzer:
         
         # Create DataFrame
         df = self._create_dataframe(elements)
+        print(f"Initial DataFrame rows: {len(df)}")
         
         # Normalize bounding boxes using the scaler
         df = bbox_scaler.normalize_bounding_boxes(df)
         
         # Filter out overlapping elements
         df = self._filter_overlapping_elements(df)
+        print(f"Rows after overlap filtering: {len(df)}")
         
         # Sort DataFrame by page and vertical position
         df['y_position'] = df['normalized_box'].apply(
@@ -183,46 +188,8 @@ class EnhancedDocumentAnalyzer:
         )
         df = df.sort_values(['page', 'y_position'])
         
-        # Create filtered and sorted elements list
-        filtered_elements = []
-        azure_elements_df = df[df['source'] == 'azure_document_intelligence']
-        layout_elements_df = df[df['source'] == 'layout_detector']
-        
-        # Process elements page by page
-        for page_num in sorted(df['page'].unique()):
-            page_df = df[df['page'] == page_num]
-            
-            for _, row in page_df.iterrows():
-                for elem in elements:
-                    if elem.page == page_num:
-                        elem_box_str = f"({elem.bounding_box.x1:.2f}, {elem.bounding_box.y1:.2f}, " \
-                                     f"{elem.bounding_box.x2:.2f}, {elem.bounding_box.y2:.2f})"
-                        
-                        if (elem.metadata.get('source') == 'layout_detector' and 
-                            elem_box_str == row['normalized_box'] and 
-                            row['source'] == 'layout_detector'):
-                            filtered_elements.append(elem)
-                            break
-                        elif (elem.metadata.get('source') == 'azure_document_intelligence' and 
-                              elem_box_str == row['normalized_box'] and 
-                              row['source'] == 'azure_document_intelligence'):
-                            filtered_elements.append(elem)
-                            break
-                            
-        # Debug information
-        print(f"Total rows in DataFrame: {len(df)}")
-        print(f"Total filtered elements: {len(filtered_elements)}")
-        print(f"Original elements: {len(elements)}")
-        
-        markdown_text = self._create_markdown(filtered_elements)
-        
-        # Debug markdown
-        if not markdown_text.strip():
-            print("Warning: Generated markdown is empty")
-            print("First few filtered elements:")
-            for elem in filtered_elements[:5]:
-                print(f"Type: {elem.element_type}, Text: {elem.text[:100] if elem.text else 'None'}")
-                
+        # Generate markdown from DataFrame
+        markdown_text = self._create_markdown_from_df(df)
         
         # Create visualizations
         visualizer = BoundingBoxVisualizer()
@@ -234,6 +201,56 @@ class EnhancedDocumentAnalyzer:
         
         return markdown_text, df, visualization_paths
 
+    def _create_markdown_from_df(self, df: pd.DataFrame) -> str:
+        """
+        Create markdown text directly from the DataFrame.
+        
+        Args:
+            df: DataFrame containing document elements
+            
+        Returns:
+            str: Markdown formatted text
+        """
+        markdown = []
+        current_page = 0
+        
+        # Process elements in order by page and vertical position
+        for _, row in df.iterrows():
+            if row['page'] != current_page:
+                current_page = row['page']
+                markdown.append(f"\n## Page {current_page}\n")
+            
+            if row['type'] == 'text':
+                # Add text content
+                if row['text']:
+                    markdown.append(row['text'])
+            elif row['type'] == 'image':
+                # Add image reference if path exists
+                if row['image_path']:
+                    try:
+                        rel_path = Path(row['image_path']).relative_to(self.output_dir)
+                        markdown.append(f"\n![]({rel_path})\n")
+                    except ValueError:
+                        markdown.append(f"\n![](/{row['image_path']})\n")
+            elif row['type'] in ['table', 'formula']:
+                # Add both image and extracted text for tables and formulas
+                if row['image_path']:
+                    try:
+                        rel_path = Path(row['image_path']).relative_to(self.output_dir)
+                        markdown.append(f"\n![]({rel_path})\n")
+                    except ValueError:
+                        markdown.append(f"\n![](/{row['image_path']})\n")
+                    
+                    # Add extracted text below if available
+                    if row['text']:
+                        markdown.append(f"\n```\n{row['text']}\n```\n")
+            elif 'caption' in row['type']:
+                # Add caption text
+                if row['text']:
+                    markdown.append(f"*{row['text']}*\n")
+                    
+        return "\n".join(markdown)
+
     def _analyze_with_azure(self, pdf_path: Path) -> Dict:
         """Analyze document with Azure Document Intelligence."""
         with open(pdf_path, "rb") as f:
@@ -241,7 +258,7 @@ class EnhancedDocumentAnalyzer:
                 "prebuilt-document", document=f)
             result = poller.result()
             return result.to_dict()
-        
+            
     def _process_azure_paragraphs(self,
                             paragraphs: List[Dict],
                             pdf_name: str,
@@ -421,28 +438,6 @@ class EnhancedDocumentAnalyzer:
         element_img.save(output_path)
         
         return str(output_path)
-
-    def _create_markdown(self, elements: List[DocumentElementRecord]) -> str:
-        """Create markdown text from document elements."""
-        markdown = []
-        current_page = 0
-        
-        for elem in sorted(elements, key=lambda x: (x.page, x.bounding_box.y1)):
-            if elem.page != current_page:
-                current_page = elem.page
-                markdown.append(f"\n## Page {current_page}\n")
-            
-            if elem.element_type == DocumentElementType.TEXT:
-                markdown.append(elem.text)
-            elif elem.element_type in [DocumentElementType.IMAGE, 
-                                     DocumentElementType.TABLE, 
-                                     DocumentElementType.FORMULA]:
-                rel_path = Path(elem.image_path).relative_to(self.output_dir)
-                markdown.append(f"\n![]({rel_path})\n")
-            elif "caption" in elem.element_type.value:
-                markdown.append(f"*{elem.text}*\n")
-                
-        return "\n".join(markdown)
 
     def _pdf_to_images(self, pdf_path: Path) -> List[Image.Image]:
         """
