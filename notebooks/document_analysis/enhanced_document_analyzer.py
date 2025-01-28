@@ -12,7 +12,8 @@ from .document_element_record import DocumentElementRecord, BoundingBox
 from .layout_detection_service import LayoutDetectionService
 from .nougat_service import NougatService
 from .document_types import DocumentElement
-from .documnet_analyzer_utils import BoundingBoxScaler, BoundingBoxVisualizer
+from .bounding_box_visualizer import BoundingBoxVisualizer
+from .bounding_box_scaler import BoundingBoxScaler
 
 from typing import Dict, List, Tuple
 import fitz  # PyMuPDF
@@ -57,8 +58,9 @@ class EnhancedDocumentAnalyzer:
         # Initialize bounding box scaler
         bbox_scaler = BoundingBoxScaler(str(pdf_path))
         
-        # Process with Azure Document Intelligence
+        # Process with Azure Document Intelligence and set dimensions
         azure_result = self._analyze_with_azure(pdf_path)
+        bbox_scaler.set_azure_dimensions(azure_result)
         
         # Extract pages from PDF for layout detection
         images = self._pdf_to_images(pdf_path)
@@ -74,9 +76,11 @@ class EnhancedDocumentAnalyzer:
             )
             
             # Process text paragraphs from Azure
+            azure_page_info = next(p for p in azure_result['pages'] if p['page_number'] == page_num)
             elements.extend(self._process_azure_paragraphs(
-                azure_result['paragraphs'], 
-                pdf_path.name, 
+                azure_result['paragraphs'],
+                pdf_path.name,
+                azure_page_info,
                 page_num
             ))
             
@@ -87,11 +91,11 @@ class EnhancedDocumentAnalyzer:
                 pdf_path.name,
                 page_num
             ))
-
+        
         # Create DataFrame
         df = self._create_dataframe(elements)
         
-        # Normalize bounding boxes
+        # Normalize bounding boxes using the scaler
         df = bbox_scaler.normalize_bounding_boxes(df)
         
         # Create markdown
@@ -114,18 +118,26 @@ class EnhancedDocumentAnalyzer:
                 "prebuilt-document", document=f)
             result = poller.result()
             return result.to_dict()
-
-    def _process_azure_paragraphs(self, 
-                                paragraphs: List[Dict], 
-                                pdf_name: str,
-                                page_num: int) -> List[DocumentElementRecord]:
+        
+    def _process_azure_paragraphs(self,
+                            paragraphs: List[Dict],
+                            pdf_name: str,
+                            page_info: Dict,
+                            page_num: int) -> List[DocumentElementRecord]:
         """Process text paragraphs from Azure Document Intelligence."""
         elements = []
+        
+        # Store page dimensions
+        page_width = float(page_info['width'])
+        page_height = float(page_info['height'])
+        page_unit = page_info['unit']
+        
         for para in paragraphs:
             if para['role'] in self.ignor_roles:
                 continue
             if len(para['content']) < self.min_length:
                 continue
+                
             if para['bounding_regions'][0]['page_number'] == page_num:
                 elements.append(DocumentElementRecord(
                     pdf_file=pdf_name,
@@ -136,9 +148,13 @@ class EnhancedDocumentAnalyzer:
                     role=para['role'],
                     spans=para['spans'],
                     metadata={
-                        'source': 'azure_document_intelligence'
+                        'source': 'azure_document_intelligence',
+                        'page_width': page_width,
+                        'page_height': page_height,
+                        'page_unit': page_unit
                     }
                 ))
+        
         return elements
 
 
@@ -340,18 +356,29 @@ class EnhancedDocumentAnalyzer:
         """Create DataFrame from document elements."""
         records = []
         for elem in elements:
+            # Get page dimensions from metadata if available
+            page_width = elem.metadata.get('page_width') if elem.metadata else None
+            page_height = elem.metadata.get('page_height') if elem.metadata else None
+            page_unit = elem.metadata.get('page_unit') if elem.metadata else None
+            
+            # Create the bounding box string
+            box = f"({elem.bounding_box.x1:.2f}, {elem.bounding_box.y1:.2f}, " \
+                f"{elem.bounding_box.x2:.2f}, {elem.bounding_box.y2:.2f})"
+                
             record = {
                 'pdf_file': elem.pdf_file,
                 'page': elem.page,
-                'bounding_box': f"({elem.bounding_box.x1:.2f}, {elem.bounding_box.y1:.2f}, "
-                               f"{elem.bounding_box.x2:.2f}, {elem.bounding_box.y2:.2f})",
+                'bounding_box': box,
                 'type': elem.element_type.value,
                 'text': elem.text,
                 'image_path': elem.image_path,
                 'role': elem.role,
                 'confidence': elem.confidence,
                 'spans': str(elem.spans) if elem.spans else None,
-                'source': elem.metadata.get('source') if elem.metadata else None
+                'source': elem.metadata.get('source') if elem.metadata else None,
+                'page_width': page_width,
+                'page_height': page_height,
+                'page_unit': page_unit
             }
             records.append(record)
             
