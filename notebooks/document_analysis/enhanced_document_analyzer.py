@@ -12,6 +12,10 @@ from .document_element_record import DocumentElementRecord, BoundingBox
 from .layout_detection_service import LayoutDetectionService
 from .nougat_service import NougatService
 from .document_types import DocumentElement
+from .documnet_analyzer_utils import BoundingBoxScaler, BoundingBoxVisualizer
+
+from typing import Dict, List, Tuple
+import fitz  # PyMuPDF
 
 class EnhancedDocumentAnalyzer:
     def __init__(self, 
@@ -37,15 +41,21 @@ class EnhancedDocumentAnalyzer:
         self.min_length = min_length
         self.ignor_roles = ignor_roles
 
-    def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame]:
+    def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame, Dict[int, str]]:
         """
-        Analyze a PDF document using both Azure Document Intelligence and local services.
+        Analyze a PDF document and create visualizations.
         
         Returns:
-            Tuple[str, pd.DataFrame]: Markdown text and elements dataframe
+            Tuple[str, pd.DataFrame, Dict[int, str]]: 
+                - Markdown text
+                - Elements dataframe
+                - Dictionary mapping page numbers to visualization paths
         """
         pdf_path = Path(pdf_path)
         elements = []
+        
+        # Initialize bounding box scaler
+        bbox_scaler = BoundingBoxScaler(str(pdf_path))
         
         # Process with Azure Document Intelligence
         azure_result = self._analyze_with_azure(pdf_path)
@@ -78,11 +88,24 @@ class EnhancedDocumentAnalyzer:
                 page_num
             ))
 
-        # Create markdown and DataFrame
-        markdown_text = self._create_markdown(elements)
+        # Create DataFrame
         df = self._create_dataframe(elements)
         
-        return markdown_text, df
+        # Normalize bounding boxes
+        df = bbox_scaler.normalize_bounding_boxes(df)
+        
+        # Create markdown
+        markdown_text = self._create_markdown(elements)
+        
+        # Create visualizations
+        visualizer = BoundingBoxVisualizer()
+        visualization_paths = visualizer.create_overlay_visualization(
+            pdf_path,
+            df,
+            self.output_dir
+        )
+        
+        return markdown_text, df, visualization_paths
 
     def _analyze_with_azure(self, pdf_path: Path) -> Dict:
         """Analyze document with Azure Document Intelligence."""
@@ -134,7 +157,7 @@ class EnhancedDocumentAnalyzer:
                 
             # Determine element type and extraction method
             extraction_method = 'default'
-            if elem.label.lower() in ['figure', 'image']:
+            if elem.label.lower() in ['figure', 'image', 'graphic', 'photo', 'diagram', 'picture']:
                 elem_type = DocumentElementType.IMAGE
             elif elem.label.lower() == 'table':
                 elem_type = DocumentElementType.TABLE
