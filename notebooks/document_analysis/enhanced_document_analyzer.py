@@ -15,8 +15,6 @@ from .document_types import DocumentElement
 from .bounding_box_visualizer import BoundingBoxVisualizer
 from .bounding_box_scaler import BoundingBoxScaler
 
-from typing import Dict, List, Tuple
-import fitz  # PyMuPDF
 
 class EnhancedDocumentAnalyzer:
     def __init__(self, 
@@ -25,6 +23,7 @@ class EnhancedDocumentAnalyzer:
                  output_dir: str = "output",
                  confidence_threshold: float = 0.7,
                  min_length: int = 10,
+                 overlap_threshold: float = 0.5,
                  ignor_roles: List[str] = ['pageFooter','footnote']):
         """Initialize the document analyzer with both Azure and local services."""
         self.output_dir = Path(output_dir)
@@ -41,6 +40,83 @@ class EnhancedDocumentAnalyzer:
         
         self.min_length = min_length
         self.ignor_roles = ignor_roles
+        self.overlap_threshold = overlap_threshold
+
+    def _calculate_overlap(self, smaller_box: Tuple[float, float, float, float], 
+                         larger_box: Tuple[float, float, float, float]) -> float:
+        """
+        Calculate the containment ratio of a smaller box within a larger box.
+        
+        Args:
+            smaller_box: Smaller bounding box (x1, y1, x2, y2)
+            larger_box: Larger bounding box (x1, y1, x2, y2)
+            
+        Returns:
+            float: Containment ratio between 0 and 1
+        """
+        # Calculate intersection coordinates
+        x1 = max(smaller_box[0], larger_box[0])
+        y1 = max(smaller_box[1], larger_box[1])
+        x2 = min(smaller_box[2], larger_box[2])
+        y2 = min(smaller_box[3], larger_box[3])
+        
+        # Check if there is an intersection
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+        
+        # Calculate areas
+        intersection = (x2 - x1) * (y2 - y1)
+        smaller_area = (smaller_box[2] - smaller_box[0]) * (smaller_box[3] - smaller_box[1])
+        
+        # Calculate containment ratio (how much of the smaller box is contained in the larger box)
+        return intersection / smaller_area if smaller_area > 0 else 0.0
+
+    def _parse_box_string(self, box_str: str) -> Tuple[float, float, float, float]:
+        """Parse a bounding box string into a tuple of coordinates."""
+        return tuple(float(x.strip()) for x in box_str.strip('()').split(','))
+
+    def _filter_overlapping_elements(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Remove Azure elements that are significantly contained within layout detector elements.
+        
+        Args:
+            df: DataFrame containing both Azure and layout detector elements
+            
+        Returns:
+            DataFrame with overlapping Azure elements removed
+        """
+        # Separate Azure and layout detector elements
+        azure_df = df[df['source'] == 'azure_document_intelligence'].copy()
+        layout_df = df[df['source'] == 'layout_detector'].copy()
+        
+        # Initialize mask for elements to keep
+        keep_mask = pd.Series(True, index=azure_df.index)
+        
+        # Check each Azure element against layout detector elements
+        for azure_idx, azure_row in azure_df.iterrows():
+            azure_box = self._parse_box_string(azure_row['normalized_box'])
+            azure_page = azure_row['page']
+            
+            # Only compare with layout elements on the same page
+            page_layout = layout_df[layout_df['page'] == azure_page]
+            
+            for _, layout_row in page_layout.iterrows():
+                layout_box = self._parse_box_string(layout_row['normalized_box'])
+                
+                # Calculate area of both boxes
+                azure_area = (azure_box[2] - azure_box[0]) * (azure_box[3] - azure_box[1])
+                layout_area = (layout_box[2] - layout_box[0]) * (layout_box[3] - layout_box[1])
+                
+                # If layout box is larger, check containment
+                if layout_area > azure_area:
+                    containment = self._calculate_overlap(azure_box, layout_box)
+                    if containment > self.overlap_threshold:
+                        keep_mask.at[azure_idx] = False
+                        break
+        
+        # Combine filtered Azure elements with layout detector elements
+        filtered_azure_df = azure_df[keep_mask]
+        return pd.concat([filtered_azure_df, layout_df], ignore_index=True)
 
     def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame, Dict[int, str]]:
         """
@@ -98,8 +174,42 @@ class EnhancedDocumentAnalyzer:
         # Normalize bounding boxes using the scaler
         df = bbox_scaler.normalize_bounding_boxes(df)
         
-        # Create markdown
-        markdown_text = self._create_markdown(elements)
+        # Filter out overlapping elements
+        df = self._filter_overlapping_elements(df)
+        
+        # Sort DataFrame by page and vertical position
+        df['y_position'] = df['normalized_box'].apply(
+            lambda x: float(x.split(',')[1].strip())  # Extract y1 coordinate
+        )
+        df = df.sort_values(['page', 'y_position'])
+        
+        # Create filtered and sorted elements list
+        filtered_elements = []
+        azure_elements_df = df[df['source'] == 'azure_document_intelligence']
+        layout_elements_df = df[df['source'] == 'layout_detector']
+        
+        # Process elements page by page
+        for page_num in sorted(df['page'].unique()):
+            page_df = df[df['page'] == page_num]
+            
+            for _, row in page_df.iterrows():
+                for elem in elements:
+                    if elem.page == page_num:
+                        elem_box_str = f"({elem.bounding_box.x1:.2f}, {elem.bounding_box.y1:.2f}, " \
+                                     f"{elem.bounding_box.x2:.2f}, {elem.bounding_box.y2:.2f})"
+                        
+                        if (elem.metadata.get('source') == 'layout_detector' and 
+                            elem_box_str == row['normalized_box'] and 
+                            row['source'] == 'layout_detector'):
+                            filtered_elements.append(elem)
+                            break
+                        elif (elem.metadata.get('source') == 'azure_document_intelligence' and 
+                              elem_box_str == row['normalized_box'] and 
+                              row['source'] == 'azure_document_intelligence'):
+                            filtered_elements.append(elem)
+                            break
+        
+        markdown_text = self._create_markdown(filtered_elements)
         
         # Create visualizations
         visualizer = BoundingBoxVisualizer()
