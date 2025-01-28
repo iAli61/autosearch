@@ -40,7 +40,9 @@ class LayoutDetectionService:
             'Header': (255, 192, 203), # Pink
             'Footer': (255, 255, 0),  # Yellow
             'Page_number': (165, 42, 42), # Brown
-            'Reference': (0, 128, 0)  # Dark Green
+            'Reference': (0, 128, 0),  # Dark Green
+            'Formula': (255, 0, 255),  # Magenta
+            'Other': (128, 128, 128)   # Gray
         }
 
     def save_page_with_boxes(self, 
