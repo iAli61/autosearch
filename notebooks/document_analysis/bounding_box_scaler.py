@@ -44,15 +44,15 @@ class BoundingBoxScaler:
             }
             
             # Debug logging for dimension comparison
-            pdf_width = self.page_dimensions[page_num]['width']
-            pdf_height = self.page_dimensions[page_num]['height']
-            azure_width_pts = self.azure_page_dimensions[page_num]['width_points']
-            azure_height_pts = self.azure_page_dimensions[page_num]['height_points']
+            # pdf_width = self.page_dimensions[page_num]['width']
+            # pdf_height = self.page_dimensions[page_num]['height']
+            # azure_width_pts = self.azure_page_dimensions[page_num]['width_points']
+            # azure_height_pts = self.azure_page_dimensions[page_num]['height_points']
             
-            print(f"\nPage {page_num} dimensions comparison:")
-            print(f"PDF (points): {pdf_width:.2f} x {pdf_height:.2f}")
-            print(f"Azure (converted to points): {azure_width_pts:.2f} x {azure_height_pts:.2f}")
-            print(f"Azure (original inches): {width_inches:.2f}\" x {height_inches:.2f}\"")
+            # print(f"\nPage {page_num} dimensions comparison:")
+            # print(f"PDF (points): {pdf_width:.2f} x {pdf_height:.2f}")
+            # print(f"Azure (converted to points): {azure_width_pts:.2f} x {azure_height_pts:.2f}")
+            # print(f"Azure (original inches): {width_inches:.2f}\" x {height_inches:.2f}\"")
     
     
     def normalize_azure_box(self, page: int, box: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
@@ -77,9 +77,9 @@ class BoundingBoxScaler:
         y2_pts = box[3] * self.POINTS_PER_INCH
         
         # Debug logging
-        print(f"\nNormalizing Azure box on page {page}:")
-        print(f"Original inches: {box}")
-        print(f"Converted to points: ({x1_pts:.2f}, {y1_pts:.2f}, {x2_pts:.2f}, {y2_pts:.2f})")
+        # print(f"\nNormalizing Azure box on page {page}:")
+        # print(f"Original inches: {box}")
+        # print(f"Converted to points: ({x1_pts:.2f}, {y1_pts:.2f}, {x2_pts:.2f}, {y2_pts:.2f})")
         
         return (x1_pts, y1_pts, x2_pts, y2_pts)
         
