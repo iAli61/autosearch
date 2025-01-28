@@ -75,9 +75,41 @@ class EnhancedDocumentAnalyzer:
         """Parse a bounding box string into a tuple of coordinates."""
         return tuple(float(x.strip()) for x in box_str.strip('()').split(','))
 
+    def _calculate_mutual_overlap(self, box1: Tuple[float, float, float, float], 
+                                box2: Tuple[float, float, float, float]) -> float:
+        """
+        Calculate mutual overlap ratio between two boxes.
+        
+        Args:
+            box1: First bounding box (x1, y1, x2, y2)
+            box2: Second bounding box (x1, y1, x2, y2)
+            
+        Returns:
+            float: Overlap ratio between 0 and 1
+        """
+        # Calculate intersection coordinates
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+        
+        # Check if there is an intersection
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+        
+        # Calculate areas
+        intersection = (x2 - x1) * (y2 - y1)
+        area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        
+        # Use the minimum area for overlap ratio
+        min_area = min(area1, area2)
+        
+        return intersection / min_area if min_area > 0 else 0.0
+
     def _filter_overlapping_elements(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Remove Azure elements that are significantly contained within layout detector elements.
+        Remove Azure elements that have significant overlap with layout detector elements.
         
         Args:
             df: DataFrame containing both Azure and layout detector elements
@@ -103,20 +135,20 @@ class EnhancedDocumentAnalyzer:
             for _, layout_row in page_layout.iterrows():
                 layout_box = self._parse_box_string(layout_row['normalized_box'])
                 
-                # Calculate area of both boxes
-                azure_area = (azure_box[2] - azure_box[0]) * (azure_box[3] - azure_box[1])
-                layout_area = (layout_box[2] - layout_box[0]) * (layout_box[3] - layout_box[1])
+                # Calculate mutual overlap
+                overlap_ratio = self._calculate_mutual_overlap(azure_box, layout_box)
                 
-                # If layout box is larger, check containment
-                if layout_area > azure_area:
-                    containment = self._calculate_overlap(azure_box, layout_box)
-                    if containment > self.overlap_threshold:
-                        keep_mask.at[azure_idx] = False
-                        break
+                # If overlap is significant, mark Azure element for removal
+                if overlap_ratio > self.overlap_threshold:
+                    print(f"Found significant overlap ({overlap_ratio:.2f}):")
+                    print(f"Azure element: {azure_row['text'][:100]}...")
+                    print(f"Layout element: {layout_row['text'][:100] if layout_row['text'] else 'No text'}...")
+                    keep_mask.at[azure_idx] = False
+                    break
         
         # Combine filtered Azure elements with layout detector elements
         filtered_azure_df = azure_df[keep_mask]
-        return pd.concat([filtered_azure_df, layout_df], ignore_index=True)
+        return pd.concat([filtered_azure_df, layout_df], ignore_index=True)    
 
     def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame, Dict[int, str]]:
         """
