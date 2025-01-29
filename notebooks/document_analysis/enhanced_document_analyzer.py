@@ -4,6 +4,7 @@ from PIL import Image
 from pathlib import Path
 from typing import Tuple, List, Dict
 import os
+import numpy as np
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
 
@@ -14,6 +15,9 @@ from .nougat_service import NougatService
 from .document_types import DocumentElement
 from .bounding_box_visualizer import BoundingBoxVisualizer
 from .bounding_box_scaler import BoundingBoxScaler
+from .azure_utils import analyze_with_azure, process_azure_paragraphs
+from .overlap_utils import filter_overlapping_elements
+from .margin_detector import MarginDetector
 
 
 class EnhancedDocumentAnalyzer:
@@ -107,52 +111,9 @@ class EnhancedDocumentAnalyzer:
         
         return intersection / min_area if min_area > 0 else 0.0
 
-    def _filter_overlapping_elements(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Remove Azure elements that have significant overlap with layout detector elements.
-        
-        Args:
-            df: DataFrame containing both Azure and layout detector elements
-            
-        Returns:
-            DataFrame with overlapping Azure elements removed
-        """
-        # Separate Azure and layout detector elements
-        azure_df = df[df['source'] == 'azure_document_intelligence'].copy()
-        layout_df = df[df['source'] == 'layout_detector'].copy()
-        
-        # Initialize mask for elements to keep
-        keep_mask = pd.Series(True, index=azure_df.index)
-        
-        # Check each Azure element against layout detector elements
-        for azure_idx, azure_row in azure_df.iterrows():
-            azure_box = self._parse_box_string(azure_row['normalized_box'])
-            azure_page = azure_row['page']
-            
-            # Only compare with layout elements on the same page
-            page_layout = layout_df[layout_df['page'] == azure_page]
-            
-            for _, layout_row in page_layout.iterrows():
-                layout_box = self._parse_box_string(layout_row['normalized_box'])
-                
-                # Calculate mutual overlap
-                overlap_ratio = self._calculate_mutual_overlap(azure_box, layout_box)
-                
-                # If overlap is significant, mark Azure element for removal
-                if overlap_ratio > self.overlap_threshold:
-                    print(f"Found significant overlap ({overlap_ratio:.2f}):")
-                    print(f"Azure element: {azure_row['text'][:100]}...")
-                    print(f"Layout element: {layout_row['text'][:100] if layout_row['text'] else 'No text'}...")
-                    keep_mask.at[azure_idx] = False
-                    break
-        
-        # Combine filtered Azure elements with layout detector elements
-        filtered_azure_df = azure_df[keep_mask]
-        return pd.concat([filtered_azure_df, layout_df], ignore_index=True)    
-
     def analyze_document(self, pdf_path: str) -> Tuple[str, pd.DataFrame, Dict[int, str]]:
         """
-        Analyze a PDF document and create visualizations.
+        Analyze a PDF document using multiple processing stages.
         
         Args:
             pdf_path: Path to the PDF file to analyze
@@ -165,73 +126,113 @@ class EnhancedDocumentAnalyzer:
         """
         pdf_path = Path(pdf_path)
         elements = []
+        print(f"\nProcessing document: {pdf_path}")
         
-        # Initialize bounding box scaler
-        bbox_scaler = BoundingBoxScaler(str(pdf_path))
-        
-        # Process with Azure Document Intelligence and set dimensions
-        azure_result = self._analyze_with_azure(pdf_path)
-        bbox_scaler.set_azure_dimensions(azure_result)
-        
-        # Extract pages from PDF for layout detection
-        images = self._pdf_to_images(pdf_path)
-        
-        # Process each page
-        for page_num, page_img in enumerate(images, 1):
-            # Get layout elements (images, tables, formulas)
-            layout_elements = self.layout_detector.detect_elements(page_img, page_num)
+        try:
+            # Initialize bounding box scaler
+            bbox_scaler = BoundingBoxScaler(str(pdf_path))
             
-            # Save visualization
-            vis_path = self.layout_detector.save_page_with_boxes(
-                page_img, layout_elements, self.output_dir, page_num
+            # Step 1: Process with Azure Document Intelligence
+            print("\nStep 1: Azure Document Analysis")
+            azure_result = analyze_with_azure(self.azure_client, pdf_path, self.output_dir)
+            bbox_scaler.set_azure_dimensions(azure_result)
+            
+            # Step 2: Convert PDF pages to images
+            print("\nStep 2: PDF to Image Conversion")
+            images = self._pdf_to_images(pdf_path)
+            print(f"Converted {len(images)} pages to images")
+            
+            # Step 3: Process each page
+            print("\nStep 3: Page Processing")
+            for page_num, page_img in enumerate(images, 1):
+                print(f"\nProcessing page {page_num}/{len(images)}")
+                
+                # 3a. Detect layout elements
+                layout_elements = self.layout_detector.detect_elements(page_img, page_num)
+                print(f"Detected {len(layout_elements)} layout elements")
+                
+                # 3b. Save visualization of layout detection
+                vis_path = self.layout_detector.save_page_with_boxes(
+                    page_img, layout_elements, self.output_dir, page_num
+                )
+                print(f"Saved layout visualization to: {vis_path}")
+                
+                # 3c. Process Azure text paragraphs
+                azure_page_info = next(p for p in azure_result['pages'] if p['page_number'] == page_num)
+                azure_elements = process_azure_paragraphs(
+                    azure_result['paragraphs'],
+                    pdf_path.name,
+                    azure_page_info,
+                    page_num,
+                    self.ignor_roles,
+                    self.min_length
+                )
+                print(f"Processed {len(azure_elements)} Azure text elements")
+                elements.extend(azure_elements)
+                
+                # 3d. Process layout elements with Nougat
+                layout_records = self._process_layout_elements(
+                    layout_elements,
+                    page_img,
+                    pdf_path.name,
+                    page_num
+                )
+                print(f"Processed {len(layout_records)} layout elements")
+                elements.extend(layout_records)
+            
+            # Step 4: Create and process DataFrame
+            print("\nStep 4: Element Processing")
+            df = self._create_dataframe(elements)
+            print(f"Initial DataFrame rows: {len(df)}")
+            
+            # 4a. Normalize bounding boxes
+            print("Normalizing bounding boxes...")
+            df = bbox_scaler.normalize_bounding_boxes(df)
+            
+            # 4b. Filter overlapping elements
+            print("Filtering overlapping elements...")
+            df = filter_overlapping_elements(df, self.overlap_threshold)
+            print(f"Rows after overlap filtering: {len(df)}")
+            
+            # 4c. Filter margin elements
+            print("Filtering margin elements...")
+            margin_detector = MarginDetector(
+                density_bins=500,  # number of bins for density analysis
+                min_column_gap=50,  # minimum gap between columns in pixels
+                peak_prominence=0.9  # sensitivity of column detection
             )
+
+            # Get margins and column layout
+            margin_sizes, column_layout = margin_detector.detect_margins(df)
+
+            # Filter elements
+            df = margin_detector.filter_margin_elements(df, margin_sizes, column_layout)
+            print(f"Rows after margin filtering: {len(df)}")
             
-            # Process text paragraphs from Azure
-            azure_page_info = next(p for p in azure_result['pages'] if p['page_number'] == page_num)
-            elements.extend(self._process_azure_paragraphs(
-                azure_result['paragraphs'],
-                pdf_path.name,
-                azure_page_info,
-                page_num
-            ))
+            # Step 5: Generate outputs
+            print("\nStep 5: Generating Outputs")
             
-            # Process layout elements
-            elements.extend(self._process_layout_elements(
-                layout_elements,
-                page_img,
-                pdf_path.name,
-                page_num
-            ))
-        
-        # Create DataFrame
-        df = self._create_dataframe(elements)
-        print(f"Initial DataFrame rows: {len(df)}")
-        
-        # Normalize bounding boxes using the scaler
-        df = bbox_scaler.normalize_bounding_boxes(df)
-        
-        # Filter out overlapping elements
-        df = self._filter_overlapping_elements(df)
-        print(f"Rows after overlap filtering: {len(df)}")
-        
-        # Sort DataFrame by page and vertical position
-        df['y_position'] = df['normalized_box'].apply(
-            lambda x: float(x.split(',')[1].strip())  # Extract y1 coordinate
-        )
-        df = df.sort_values(['page', 'y_position'])
-        
-        # Generate markdown from DataFrame
-        markdown_text = self._create_markdown_from_df(df)
-        
-        # Create visualizations
-        visualizer = BoundingBoxVisualizer()
-        visualization_paths = visualizer.create_overlay_visualization(
-            pdf_path,
-            df,
-            self.output_dir
-        )
-        
-        return markdown_text, df, visualization_paths
+            # 5a. Create markdown
+            print("Generating markdown...")
+            markdown_text = self._create_markdown_from_df(df)
+            
+            # 5b. Create visualizations
+            print("Creating visualizations...")
+            visualizer = BoundingBoxVisualizer()
+            visualization_paths = visualizer.create_overlay_visualization(
+                pdf_path,
+                df,
+                self.output_dir
+            )
+            print(f"Created {len(visualization_paths)} page visualizations")
+            
+            return markdown_text, df, visualization_paths
+            
+        except Exception as e:
+            print(f"\nError processing document: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def _create_markdown_from_df(self, df: pd.DataFrame) -> str:
         """
@@ -282,53 +283,6 @@ class EnhancedDocumentAnalyzer:
                     markdown.append(f"*{row['text']}*\n")
                     
         return "\n".join(markdown)
-
-    def _analyze_with_azure(self, pdf_path: Path) -> Dict:
-        """Analyze document with Azure Document Intelligence."""
-        with open(pdf_path, "rb") as f:
-            poller = self.azure_client.begin_analyze_document(
-                "prebuilt-document", document=f)
-            result = poller.result()
-            return result.to_dict()
-            
-    def _process_azure_paragraphs(self,
-                            paragraphs: List[Dict],
-                            pdf_name: str,
-                            page_info: Dict,
-                            page_num: int) -> List[DocumentElementRecord]:
-        """Process text paragraphs from Azure Document Intelligence."""
-        elements = []
-        
-        # Store page dimensions
-        page_width = float(page_info['width'])
-        page_height = float(page_info['height'])
-        page_unit = page_info['unit']
-        
-        for para in paragraphs:
-            if para['role'] in self.ignor_roles:
-                continue
-            if len(para['content']) < self.min_length:
-                continue
-                
-            if para['bounding_regions'][0]['page_number'] == page_num:
-                elements.append(DocumentElementRecord(
-                    pdf_file=pdf_name,
-                    page=page_num,
-                    bounding_box=BoundingBox.from_azure_regions(para['bounding_regions']),
-                    element_type=DocumentElementType.TEXT,
-                    text=para['content'],
-                    role=para['role'],
-                    spans=para['spans'],
-                    metadata={
-                        'source': 'azure_document_intelligence',
-                        'page_width': page_width,
-                        'page_height': page_height,
-                        'page_unit': page_unit
-                    }
-                ))
-        
-        return elements
-
 
     def _process_layout_elements(self,
                                 elements: List[DocumentElement],
@@ -510,6 +464,7 @@ class EnhancedDocumentAnalyzer:
             page_width = elem.metadata.get('page_width') if elem.metadata else None
             page_height = elem.metadata.get('page_height') if elem.metadata else None
             page_unit = elem.metadata.get('page_unit') if elem.metadata else None
+            azure_order_id = elem.metadata.get('azure_order_id') if elem.metadata else float('inf')
             
             # Create the bounding box string
             box = f"({elem.bounding_box.x1:.2f}, {elem.bounding_box.y1:.2f}, " \
@@ -528,7 +483,8 @@ class EnhancedDocumentAnalyzer:
                 'source': elem.metadata.get('source') if elem.metadata else None,
                 'page_width': page_width,
                 'page_height': page_height,
-                'page_unit': page_unit
+                'page_unit': page_unit,
+                'azure_order_id': azure_order_id  # Add azure_order_id to DataFrame
             }
             records.append(record)
             

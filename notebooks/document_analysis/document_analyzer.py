@@ -28,11 +28,11 @@ class DocumentAnalyzer:
 
     def analyze_document(self, pdf_path: str) -> DocumentResult:
         pdf_path = Path(pdf_path)
-        print(f"Processing document: {pdf_path}")
+        # print(f"Processing document: {pdf_path}")
         
         # Convert PDF pages to images
         images = self._pdf_to_images(pdf_path)
-        print(f"Converted {len(images)} pages to images")
+        # print(f"Converted {len(images)} pages to images")
         
         # Extract metadata
         metadata = self._extract_metadata(pdf_path)
@@ -40,7 +40,7 @@ class DocumentAnalyzer:
         # Process each page
         pages = []
         for page_num, page_img in enumerate(images, 1):
-            print(f"Processing page {page_num}/{len(images)}")
+            # print(f"Processing page {page_num}/{len(images)}")
             
             # Detect layout elements
             elements = self.layout_detector.detect_elements(page_img, page_num)

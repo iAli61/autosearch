@@ -106,9 +106,9 @@ class BoundingBoxScaler:
         y2 = box[3] / zoom_factor
         
         # Debug logging
-        print(f"\nNormalizing Layout box on page {page}:")
-        print(f"Original coordinates (pixels): {box}")
-        print(f"After normalization (points): ({x1:.2f}pt, {y1:.2f}pt, {x2:.2f}pt, {y2:.2f}pt)")
+        # print(f"\nNormalizing Layout box on page {page}:")
+        # print(f"Original coordinates (pixels): {box}")
+        # print(f"After normalization (points): ({x1:.2f}pt, {y1:.2f}pt, {x2:.2f}pt, {y2:.2f}pt)")
         
         return (x1, y1, x2, y2)
     
@@ -132,7 +132,7 @@ class BoundingBoxScaler:
             source = row['source']
             
             try:
-                print(f"\nProcessing {source} element on page {page}")
+                print(f"\n{source} element on page {page}")
                 if source == 'azure_document_intelligence':
                     normalized_box = self.normalize_azure_box(page, box)
                 elif source == 'layout_detector':
